@@ -525,6 +525,13 @@ class SysMon:
             bar.create_rectangle(0, 0, 0, 5, fill=self.GRN, outline="", tags="fill")
             self._dsk_part_rows.append({"bar": bar, "txt": txt, "mp": mp})
 
+        for dr in self._dsk_part_rows:
+            try:
+                u = psutil.disk_usage(dr["mp"])
+                dr["txt"].config(text=f"{u.used / 2**30:.0f}/{u.total / 2**30:.0f}G")
+            except Exception:
+                pass
+
     def _upd_disk(self):
         t = time.time()
         io = psutil.disk_io_counters()
