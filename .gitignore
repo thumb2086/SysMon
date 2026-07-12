@@ -1,0 +1,4 @@
+*.vbs
+*.pyc
+__pycache__/
+.git/
