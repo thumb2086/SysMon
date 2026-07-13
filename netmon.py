@@ -86,7 +86,8 @@ class SysMon:
     def _probe_gpu(self):
         try:
             r = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-                               capture_output=True, text=True, timeout=3)
+                               capture_output=True, text=True, timeout=3,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
             if r.returncode == 0 and r.stdout.strip():
                 self._gpu_name = r.stdout.strip().replace("NVIDIA ", "")
                 self._gpu_ok = True
@@ -98,7 +99,8 @@ class SysMon:
             return None
         try:
             r = subprocess.run(["nvidia-smi", f"--query-gpu={fields}", "--format=csv,noheader,nounits"],
-                               capture_output=True, text=True, timeout=3)
+                               capture_output=True, text=True, timeout=3,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
             if r.returncode == 0:
                 return [p.strip() for p in r.stdout.strip().split(", ")]
         except Exception:
@@ -112,7 +114,8 @@ class SysMon:
                     r = subprocess.run(
                         ["powershell", "-NoProfile", "-Command",
                          "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation | Select-Object -ExpandProperty Temperature"],
-                        capture_output=True, text=True, timeout=5)
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
                     vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
                     self._bg_cpu_temp = max(vals) / 10.0 if vals else None
                 except Exception:
@@ -122,7 +125,8 @@ class SysMon:
                     r = subprocess.run(
                         ["powershell", "-NoProfile", "-Command",
                          "Get-CimInstance -Namespace root/cimv2 -ClassName Win32_PerfFormattedData_Counters_ProcessorInformation | Where-Object Name -ne '_Total' | Select-Object -ExpandProperty PercentProcessorPerformance"],
-                        capture_output=True, text=True, timeout=5)
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
                     vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
                     if vals:
                         base = psutil.cpu_freq().max or 3000
@@ -135,7 +139,8 @@ class SysMon:
                         r = subprocess.run(
                             ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,temperature.gpu,power.draw,memory.used,memory.total",
                              "--format=csv,noheader,nounits"],
-                            capture_output=True, text=True, timeout=5)
+                            capture_output=True, text=True, timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW)
                         if r.returncode == 0:
                             parts = [p.strip() for p in r.stdout.strip().split(", ")]
                             if len(parts) >= 8:
@@ -147,7 +152,8 @@ class SysMon:
                     r = subprocess.run(
                         ["powershell", "-NoProfile", "-Command",
                          "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object Name -ne '_Total' | Select-Object Name, PercentDiskTime | ConvertTo-Csv -NoTypeInformation"],
-                        capture_output=True, text=True, timeout=5)
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
                     lines = r.stdout.strip().splitlines()
                     result = []
                     for line in lines[1:]:
