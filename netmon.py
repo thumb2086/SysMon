@@ -128,13 +128,12 @@ class SysMon:
                 try:
                     r = subprocess.run(
                         ["powershell", "-NoProfile", "-Command",
-                         "Get-CimInstance -Namespace root/cimv2 -ClassName Win32_PerfFormattedData_Counters_ProcessorInformation | Where-Object Name -ne '_Total' | Select-Object -ExpandProperty PercentProcessorPerformance"],
+                         "Get-CimInstance -Namespace root/cimv2 -ClassName Win32_PerfFormattedData_Counters_ProcessorInformation | Where-Object Name -ne '_Total' | Select-Object ActualFrequency"],
                         capture_output=True, text=True, timeout=5,
                         creationflags=subprocess.CREATE_NO_WINDOW)
                     vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
                     if vals:
-                        base = psutil.cpu_freq().max or 3000
-                        self._bg_cpu_freqs = [base * v // 100 for v in vals]
+                        self._bg_cpu_freqs = vals
                 except Exception:
                     pass
 
@@ -362,10 +361,7 @@ class SysMon:
         self._mem_use.pack(side=tk.LEFT, padx=(0, 4))
         self._mem_swp = tk.Label(self._mem_h, bg=self.CARD, fg=self.DIM,
                                  font=("Consolas", 9))
-        self._mem_swp.pack(side=tk.LEFT, padx=(0, 4))
-        self._sys_pwr = tk.Label(self._mem_h, bg=self.CARD, fg=self.DIM,
-                                 font=("Consolas", 9))
-        self._sys_pwr.pack(side=tk.LEFT)
+        self._mem_swp.pack(side=tk.LEFT)
 
         self._mem_bar = tk.Canvas(self._mem_f, height=8, bg=self.BG, highlightthickness=0)
         self._mem_bar.pack(fill=tk.X)
@@ -379,8 +375,6 @@ class SysMon:
         self._mem_pct.config(text=f"{p:.0f}%", fg=fg)
         self._mem_use.config(text=f"{m.used / 2**30:.1f} / {m.total / 2**30:.1f} GB")
         self._mem_swp.config(text=f"SWAP {sw.used / 2**30:.1f}G" if sw.total > 0 and sw.used / 2**30 > 0.1 else "")
-        spwr = self._bg_sys_power
-        self._sys_pwr.config(text=f"SYS {spwr:.0f}W" if spwr else "")
         self._mem_f.config(bg=bg)
         self._bar(self._mem_bar, p, fg)
 
