@@ -20,7 +20,7 @@ jobs:
 
       - run: pip install pyinstaller psutil
 
-      - run: pyinstaller --onefile --windowed --name SysMon netmon.py
+      - run: pyinstaller --onefile --windowed --name SysMon --uac-admin netmon.py
 
       - uses: softprops/action-gh-release@v2
         with:

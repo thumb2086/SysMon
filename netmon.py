@@ -3,6 +3,7 @@ import psutil
 import subprocess
 import time
 import threading
+import ctypes
 from collections import deque
 
 
@@ -28,22 +29,22 @@ def fmt_bytes(b):
 
 
 class SysMon:
-    BG = "#111113"
-    CARD = "#1a1a1f"
-    BORDER = "#2a2a30"
-    TXT = "#e0e0e0"
-    DIM = "#666670"
-    GRN = "#22c55e"
-    ORG = "#f59e0b"
-    RED = "#ef4444"
-    BLU = "#3b82f6"
-    PPL = "#a855f7"
-    CYN = "#06b6d4"
-    PNK = "#ec4899"
-    YEL = "#eab308"
-    BGRN = "#15332a"
-    BORG = "#332a15"
-    BRED = "#331515"
+    BG = "#f0f0f0"
+    CARD = "#ffffff"
+    BORDER = "#e0e0e0"
+    TXT = "#1a1a1a"
+    DIM = "#888888"
+    GRN = "#16a34a"
+    ORG = "#d97706"
+    RED = "#dc2626"
+    BLU = "#2563eb"
+    PPL = "#9333ea"
+    CYN = "#0891b2"
+    PNK = "#db2777"
+    YEL = "#ca8a04"
+    BGRN = "#dcfce7"
+    BORG = "#fef3c7"
+    BRED = "#fee2e2"
 
     def __init__(self):
         self.root = tk.Tk()
@@ -74,6 +75,8 @@ class SysMon:
         self._bg_gpu_data = None
         self._bg_disk_act = []
         self._last_parts = set()
+        self._bg_cpu_power = None
+        self._bg_sys_power = None
 
         self._build()
         self._place()
@@ -109,32 +112,43 @@ class SysMon:
 
     def _bg_probe_all(self):
         def work():
-            while True:
-                try:
-                    r = subprocess.run(
-                        ["powershell", "-NoProfile", "-Command",
-                         "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation | Select-Object -ExpandProperty Temperature"],
-                        capture_output=True, text=True, timeout=5,
-                        creationflags=subprocess.CREATE_NO_WINDOW)
-                    vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
-                    self._bg_cpu_temp = max(vals) / 10.0 if vals else None
-                except Exception:
-                    self._bg_cpu_temp = None
+            try:
+                import clr as _clr
+                import sys as _sys
+                _sys.path.append(r'C:\Users\CPXru\Downloads\LibreHardwareMonitor')
+                _clr.AddReference('LibreHardwareMonitorLib')
+                from LibreHardwareMonitor.Hardware import Computer, SensorType
 
-                try:
-                    r = subprocess.run(
-                        ["powershell", "-NoProfile", "-Command",
-                         "Get-CimInstance -Namespace root/cimv2 -ClassName Win32_PerfFormattedData_Counters_ProcessorInformation | Where-Object Name -ne '_Total' | Select-Object -ExpandProperty PercentProcessorPerformance"],
-                        capture_output=True, text=True, timeout=5,
-                        creationflags=subprocess.CREATE_NO_WINDOW)
-                    vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
-                    if vals:
-                        base = psutil.cpu_freq().max or 3000
-                        self._bg_cpu_freqs = [base * v // 100 for v in vals]
-                except Exception:
-                    pass
+                computer = Computer()
+                computer.IsCpuEnabled = True
+                computer.IsGpuEnabled = True
+                computer.Open()
 
-                if self._gpu_ok:
+                for _ in range(3):
+                    for hw in computer.Hardware:
+                        hw.Update()
+                        for sub in hw.SubHardware:
+                            sub.Update()
+
+                while True:
+                    for hw in computer.Hardware:
+                        hw.Update()
+                        for sub in hw.SubHardware:
+                            sub.Update()
+                        for s in hw.Sensors:
+                            if s.Value is None:
+                                continue
+                            v = float(s.Value)
+                            name = s.Name.lower()
+                            hw_name = hw.Name.lower()
+                            if s.SensorType == SensorType.Temperature:
+                                if 'cpu' in hw_name and ('package' in name or 'core' in name):
+                                    if v > 20:
+                                        self._bg_cpu_temp = v
+                            elif s.SensorType == SensorType.Power:
+                                if 'cpu' in hw_name and 'package' in name:
+                                    self._bg_cpu_power = v
+
                     try:
                         r = subprocess.run(
                             ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,temperature.gpu,power.draw,memory.used,memory.total",
@@ -148,23 +162,39 @@ class SysMon:
                     except Exception:
                         pass
 
-                try:
-                    r = subprocess.run(
-                        ["powershell", "-NoProfile", "-Command",
-                         "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object Name -ne '_Total' | Select-Object Name, PercentDiskTime | ConvertTo-Csv -NoTypeInformation"],
-                        capture_output=True, text=True, timeout=5,
-                        creationflags=subprocess.CREATE_NO_WINDOW)
-                    lines = r.stdout.strip().splitlines()
-                    result = []
-                    for line in lines[1:]:
-                        parts = line.strip('"').split('","')
-                        if len(parts) >= 2:
-                            result.append((parts[0].strip('"'), float(parts[1].strip('"'))))
-                    self._bg_disk_act = result
-                except Exception:
-                    pass
+                    try:
+                        r = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command",
+                             "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object Name -ne '_Total' | Select-Object Name, PercentDiskTime | ConvertTo-Csv -NoTypeInformation"],
+                            capture_output=True, text=True, timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW)
+                        lines = r.stdout.strip().splitlines()
+                        result = []
+                        for line in lines[1:]:
+                            parts = line.strip('"').split('","')
+                            if len(parts) >= 2:
+                                result.append((parts[0].strip('"'), float(parts[1].strip('"'))))
+                        self._bg_disk_act = result
+                    except Exception:
+                        pass
 
-                time.sleep(2)
+                    time.sleep(2)
+
+            except Exception as e:
+                while True:
+                    try:
+                        r = subprocess.run(
+                            ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,temperature.gpu,power.draw,memory.used,memory.total",
+                             "--format=csv,noheader,nounits"],
+                            capture_output=True, text=True, timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW)
+                        if r.returncode == 0:
+                            parts = [p.strip() for p in r.stdout.strip().split(", ")]
+                            if len(parts) >= 8:
+                                self._bg_gpu_data = [float(x) for x in parts]
+                    except Exception:
+                        pass
+                    time.sleep(2)
 
         t = threading.Thread(target=work, daemon=True)
         t.start()
@@ -231,9 +261,9 @@ class SysMon:
         self._cpu_pct = tk.Label(self._cpu_h, bg=self.CARD, fg=self.GRN,
                                  font=("Consolas", 14, "bold"))
         self._cpu_pct.pack(side=tk.LEFT, padx=(6, 4))
-        self._cpu_tmp = tk.Label(self._cpu_h, bg=self.CARD, fg=self.GRN,
-                                 font=("Consolas", 10))
-        self._cpu_tmp.pack(side=tk.LEFT, padx=(0, 4))
+        self._cpu_pwr = tk.Label(self._cpu_h, bg=self.CARD, fg=self.DIM,
+                                 font=("Consolas", 9))
+        self._cpu_pwr.pack(side=tk.LEFT, padx=(0, 4))
         self._cpu_frq = tk.Label(self._cpu_h, bg=self.CARD, fg=self.DIM,
                                  font=("Consolas", 9))
         self._cpu_frq.pack(side=tk.LEFT)
@@ -274,8 +304,8 @@ class SysMon:
         fg = self.GRN if pct < 50 else (self.ORG if pct < 80 else self.RED)
         bg = self.BGRN if pct < 50 else (self.BORG if pct < 80 else self.BRED)
         self._cpu_pct.config(text=f"{pct:.0f}%", fg=fg)
-        self._cpu_tmp.config(text=f"{tmp:.1f}°C" if tmp else "--°C",
-                             fg=fg if tmp else self.DIM)
+        pwr = self._bg_cpu_power
+        self._cpu_pwr.config(text=f"{pwr:.0f}W" if pwr else "")
         avg = sum(self._core_freqs) // len(self._core_freqs) if self._core_freqs else (f.current if f else 0)
         self._cpu_frq.config(text=f"{avg / 1000:.2f} GHz" if avg else "")
         self._cpu_f.config(bg=bg)
@@ -363,7 +393,10 @@ class SysMon:
         self._mem_use.pack(side=tk.LEFT, padx=(0, 4))
         self._mem_swp = tk.Label(self._mem_h, bg=self.CARD, fg=self.DIM,
                                  font=("Consolas", 9))
-        self._mem_swp.pack(side=tk.LEFT)
+        self._mem_swp.pack(side=tk.LEFT, padx=(0, 4))
+        self._sys_pwr = tk.Label(self._mem_h, bg=self.CARD, fg=self.DIM,
+                                 font=("Consolas", 9))
+        self._sys_pwr.pack(side=tk.LEFT)
 
         self._mem_bar = tk.Canvas(self._mem_f, height=8, bg=self.BG, highlightthickness=0)
         self._mem_bar.pack(fill=tk.X)
@@ -377,6 +410,8 @@ class SysMon:
         self._mem_pct.config(text=f"{p:.0f}%", fg=fg)
         self._mem_use.config(text=f"{m.used / 2**30:.1f} / {m.total / 2**30:.1f} GB")
         self._mem_swp.config(text=f"SWAP {sw.used / 2**30:.1f}G" if sw.total > 0 and sw.used / 2**30 > 0.1 else "")
+        spwr = self._bg_sys_power
+        self._sys_pwr.config(text=f"SYS {spwr:.0f}W" if spwr else "")
         self._mem_f.config(bg=bg)
         self._bar(self._mem_bar, p, fg)
 
