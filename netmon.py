@@ -112,43 +112,33 @@ class SysMon:
 
     def _bg_probe_all(self):
         def work():
-            try:
-                import clr as _clr
-                import sys as _sys
-                _sys.path.append(r'C:\Users\CPXru\Downloads\LibreHardwareMonitor')
-                _clr.AddReference('LibreHardwareMonitorLib')
-                from LibreHardwareMonitor.Hardware import Computer, SensorType
+            while True:
+                try:
+                    r = subprocess.run(
+                        ["powershell", "-NoProfile", "-Command",
+                         "Get-CimInstance -Namespace root/WMI -ClassName MSAcpi_ThermalZoneTemperature | Select-Object -ExpandProperty CurrentTemperature"],
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
+                    vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
+                    if vals:
+                        self._bg_cpu_temp = max(vals) / 10.0 - 273.15
+                except Exception:
+                    self._bg_cpu_temp = None
 
-                computer = Computer()
-                computer.IsCpuEnabled = True
-                computer.IsGpuEnabled = True
-                computer.Open()
+                try:
+                    r = subprocess.run(
+                        ["powershell", "-NoProfile", "-Command",
+                         "Get-CimInstance -Namespace root/cimv2 -ClassName Win32_PerfFormattedData_Counters_ProcessorInformation | Where-Object Name -ne '_Total' | Select-Object -ExpandProperty PercentProcessorPerformance"],
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
+                    vals = [int(x) for x in r.stdout.strip().split() if x.isdigit()]
+                    if vals:
+                        base = psutil.cpu_freq().max or 3000
+                        self._bg_cpu_freqs = [base * v // 100 for v in vals]
+                except Exception:
+                    pass
 
-                for _ in range(3):
-                    for hw in computer.Hardware:
-                        hw.Update()
-                        for sub in hw.SubHardware:
-                            sub.Update()
-
-                while True:
-                    for hw in computer.Hardware:
-                        hw.Update()
-                        for sub in hw.SubHardware:
-                            sub.Update()
-                        for s in hw.Sensors:
-                            if s.Value is None:
-                                continue
-                            v = float(s.Value)
-                            name = s.Name.lower()
-                            hw_name = hw.Name.lower()
-                            if s.SensorType == SensorType.Temperature:
-                                if 'cpu' in hw_name and ('package' in name or 'core' in name):
-                                    if v > 20:
-                                        self._bg_cpu_temp = v
-                            elif s.SensorType == SensorType.Power:
-                                if 'cpu' in hw_name and 'package' in name:
-                                    self._bg_cpu_power = v
-
+                if self._gpu_ok:
                     try:
                         r = subprocess.run(
                             ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,temperature.gpu,power.draw,memory.used,memory.total",
@@ -162,39 +152,23 @@ class SysMon:
                     except Exception:
                         pass
 
-                    try:
-                        r = subprocess.run(
-                            ["powershell", "-NoProfile", "-Command",
-                             "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object Name -ne '_Total' | Select-Object Name, PercentDiskTime | ConvertTo-Csv -NoTypeInformation"],
-                            capture_output=True, text=True, timeout=5,
-                            creationflags=subprocess.CREATE_NO_WINDOW)
-                        lines = r.stdout.strip().splitlines()
-                        result = []
-                        for line in lines[1:]:
-                            parts = line.strip('"').split('","')
-                            if len(parts) >= 2:
-                                result.append((parts[0].strip('"'), float(parts[1].strip('"'))))
-                        self._bg_disk_act = result
-                    except Exception:
-                        pass
+                try:
+                    r = subprocess.run(
+                        ["powershell", "-NoProfile", "-Command",
+                         "Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | Where-Object Name -ne '_Total' | Select-Object Name, PercentDiskTime | ConvertTo-Csv -NoTypeInformation"],
+                        capture_output=True, text=True, timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW)
+                    lines = r.stdout.strip().splitlines()
+                    result = []
+                    for line in lines[1:]:
+                        parts = line.strip('"').split('","')
+                        if len(parts) >= 2:
+                            result.append((parts[0].strip('"'), float(parts[1].strip('"'))))
+                    self._bg_disk_act = result
+                except Exception:
+                    pass
 
-                    time.sleep(2)
-
-            except Exception as e:
-                while True:
-                    try:
-                        r = subprocess.run(
-                            ["nvidia-smi", "--query-gpu=utilization.gpu,utilization.memory,utilization.encoder,utilization.decoder,temperature.gpu,power.draw,memory.used,memory.total",
-                             "--format=csv,noheader,nounits"],
-                            capture_output=True, text=True, timeout=5,
-                            creationflags=subprocess.CREATE_NO_WINDOW)
-                        if r.returncode == 0:
-                            parts = [p.strip() for p in r.stdout.strip().split(", ")]
-                            if len(parts) >= 8:
-                                self._bg_gpu_data = [float(x) for x in parts]
-                    except Exception:
-                        pass
-                    time.sleep(2)
+                time.sleep(2)
 
         t = threading.Thread(target=work, daemon=True)
         t.start()
@@ -261,9 +235,6 @@ class SysMon:
         self._cpu_pct = tk.Label(self._cpu_h, bg=self.CARD, fg=self.GRN,
                                  font=("Consolas", 14, "bold"))
         self._cpu_pct.pack(side=tk.LEFT, padx=(6, 4))
-        self._cpu_pwr = tk.Label(self._cpu_h, bg=self.CARD, fg=self.DIM,
-                                 font=("Consolas", 9))
-        self._cpu_pwr.pack(side=tk.LEFT, padx=(0, 4))
         self._cpu_frq = tk.Label(self._cpu_h, bg=self.CARD, fg=self.DIM,
                                  font=("Consolas", 9))
         self._cpu_frq.pack(side=tk.LEFT)
@@ -304,8 +275,6 @@ class SysMon:
         fg = self.GRN if pct < 50 else (self.ORG if pct < 80 else self.RED)
         bg = self.BGRN if pct < 50 else (self.BORG if pct < 80 else self.BRED)
         self._cpu_pct.config(text=f"{pct:.0f}%", fg=fg)
-        pwr = self._bg_cpu_power
-        self._cpu_pwr.config(text=f"{pwr:.0f}W" if pwr else "")
         avg = sum(self._core_freqs) // len(self._core_freqs) if self._core_freqs else (f.current if f else 0)
         self._cpu_frq.config(text=f"{avg / 1000:.2f} GHz" if avg else "")
         self._cpu_f.config(bg=bg)
