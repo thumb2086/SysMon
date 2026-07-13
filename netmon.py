@@ -29,29 +29,55 @@ def fmt_bytes(b):
 
 
 class SysMon:
-    BG = "#f0f0f0"
-    CARD = "#ffffff"
-    BORDER = "#e0e0e0"
-    TXT = "#1a1a1a"
-    DIM = "#888888"
-    GRN = "#16a34a"
-    ORG = "#d97706"
-    RED = "#dc2626"
-    BLU = "#2563eb"
-    PPL = "#9333ea"
-    CYN = "#0891b2"
-    PNK = "#db2777"
-    YEL = "#ca8a04"
-    BGRN = "#dcfce7"
-    BORG = "#fef3c7"
-    BRED = "#fee2e2"
+    THEMES = {
+        "light": {
+            "BG": "#f0f0f0", "CARD": "#ffffff", "BORDER": "#e0e0e0",
+            "TXT": "#1a1a1a", "DIM": "#888888",
+            "GRN": "#16a34a", "ORG": "#d97706", "RED": "#dc2626",
+            "BLU": "#2563eb", "PPL": "#9333ea", "CYN": "#0891b2",
+            "PNK": "#db2777", "YEL": "#ca8a04",
+            "BGRN": "#dcfce7", "BORG": "#fef3c7", "BRED": "#fee2e2",
+        },
+        "dark": {
+            "BG": "#111113", "CARD": "#1a1a1f", "BORDER": "#2a2a30",
+            "TXT": "#e0e0e0", "DIM": "#666670",
+            "GRN": "#22c55e", "ORG": "#f59e0b", "RED": "#ef4444",
+            "BLU": "#3b82f6", "PPL": "#a855f7", "CYN": "#06b6d4",
+            "PNK": "#ec4899", "YEL": "#eab308",
+            "BGRN": "#15332a", "BORG": "#332a15", "BRED": "#331515",
+        },
+    }
+
+    def _theme(self):
+        try:
+            import winreg
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                               r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+            v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0]
+            winreg.CloseKey(k)
+            return "light" if v else "dark"
+        except Exception:
+            return "light"
 
     def __init__(self):
+        theme = self.THEMES[self._theme()]
+        for k, v in theme.items():
+            setattr(self, k, v)
+
         self.root = tk.Tk()
         self.root.title("SysMon")
         self.root.configure(bg=self.BG)
         self.root.attributes("-topmost", True)
         self.root.resizable(False, False)
+        if self._theme() == "dark":
+            try:
+                hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+                DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                    ctypes.byref(ctypes.c_int(1)), ctypes.sizeof(ctypes.c_int))
+            except Exception:
+                pass
 
         self._dsk_r = self._dsk_w = self._dsk_t = 0
         self._net_s = self._net_r = self._net_t = 0
@@ -585,10 +611,10 @@ class SysMon:
         self._dr_h.append(rs)
         self._dw_h.append(ws)
 
-        self._dr.config(text=f"◀ {fmt_spd(rs)}")
-        self._dw.config(text=f"▶ {fmt_spd(ws)}")
-        self._drt.config(text=f"{fmt_bytes(io.read_bytes)}")
-        self._dwt.config(text=f"{fmt_bytes(io.write_bytes)}")
+        self._dr.config(text=f"R {fmt_spd(rs)}")
+        self._dw.config(text=f"W {fmt_spd(ws)}")
+        self._drt.config(text=f"R {fmt_bytes(io.read_bytes)}")
+        self._dwt.config(text=f"W {fmt_bytes(io.write_bytes)}")
 
         self._dg.delete("all")
         gw = self._dg.winfo_width() or 260
@@ -631,7 +657,7 @@ class SysMon:
     def _place(self):
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        self.root.geometry(f"380x640+{sw - 400}+{sh - 700}")
+        self.root.geometry(f"420x640+{sw - 440}+{sh - 700}")
 
     def _toggle_pin(self, e=None):
         cur = self.root.attributes("-topmost")
