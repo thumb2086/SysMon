@@ -201,6 +201,9 @@ class SysMon:
         self._hdr.pack_propagate(False)
         tk.Label(self._hdr, text="  SYS MON", bg=self.CARD, fg=self.DIM,
                  font=("Segoe UI", 8, "bold")).pack(side=tk.LEFT, fill=tk.Y)
+        self._uptime = tk.Label(self._hdr, text="", bg=self.CARD, fg=self.DIM,
+                                font=("Consolas", 7))
+        self._uptime.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0))
         self._pin_btn = tk.Label(self._hdr, text="📌", bg=self.CARD, fg=self.GRN,
                                  font=("Segoe UI", 9), cursor="hand2")
         self._pin_btn.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 4))
@@ -262,14 +265,13 @@ class SysMon:
             self._cpu_cells.append((cell, bar, lb, ch))
 
     def _upd_cpu(self):
-        if self._freq_tick % 3 == 0:
+        if self._freq_tick % 2 == 0:
             self._core_freqs = self._bg_cpu_freqs
         self._freq_tick += 1
 
         pct = psutil.cpu_percent(interval=None)
         cores = psutil.cpu_percent(interval=None, percpu=True)
         f = psutil.cpu_freq()
-        tmp = self._bg_cpu_temp
 
         fg = self.GRN if pct < 50 else (self.ORG if pct < 80 else self.RED)
         bg = self.BGRN if pct < 50 else (self.BORG if pct < 80 else self.BRED)
@@ -607,6 +609,13 @@ class SysMon:
         self._pin_btn.config(fg=self.GRN if not cur else self.DIM)
 
     def _tick(self):
+        boot = psutil.boot_time()
+        uptime_s = time.time() - boot
+        d = int(uptime_s // 86400)
+        h = int((uptime_s % 86400) // 3600)
+        m = int((uptime_s % 3600) // 60)
+        self._uptime.config(text=f"UP {d}d {h}h {m}m" if d else f"UP {h}h {m}m")
+
         cur_parts = set()
         for pt in psutil.disk_partitions():
             if pt.fstype and 'cdrom' not in pt.opts:
