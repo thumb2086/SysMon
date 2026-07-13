@@ -10,11 +10,11 @@ from collections import deque
 def fmt_spd(bps):
     mbps = bps * 8 / 10**6
     if mbps >= 1000:
-        return f"{mbps / 1000:.2f} Gbps"
+        return f"{mbps / 1000:.2f} Gbps".rjust(12)
     elif mbps >= 1:
-        return f"{mbps:.1f} Mbps"
+        return f"{mbps:.1f} Mbps".rjust(12)
     else:
-        return f"{mbps * 1000:.0f} Kbps"
+        return f"{mbps * 1000:.0f} Kbps".rjust(12)
 
 
 def fmt_bytes(b):
@@ -59,6 +59,8 @@ class SysMon:
         self._net_up_h = deque(maxlen=60)
         self._dr_h = deque(maxlen=60)
         self._dw_h = deque(maxlen=60)
+        self._cpu_hist = deque(maxlen=60)
+        self._gpu_hist = deque(maxlen=60)
         self._net_dn_max = 1
         self._net_up_max = 1
 
@@ -193,6 +195,23 @@ class SysMon:
         lb.pack(side=tk.TOP, anchor="w")
         return lb
 
+    def _draw_chart(self, canvas, data, color):
+        canvas.delete("all")
+        gw = canvas.winfo_width() or 260
+        gh = 30
+        vals = list(data)
+        if len(vals) < 2:
+            return
+        mx = max(vals) or 1
+        step = gw / (len(vals) - 1)
+        pts = []
+        for i, v in enumerate(vals):
+            x = i * step
+            y = gh - 2 - (v / mx) * (gh - 4)
+            pts.append((x, y))
+        canvas.create_line([c for p in pts for c in p], fill=color, width=1.5, smooth=True)
+        canvas.create_line(0, gh - 1, gw, gh - 1, fill=self.DIM, dash=(2, 4))
+
     # ── build ──
 
     def _build(self):
@@ -244,6 +263,9 @@ class SysMon:
         self._cpu_bar = tk.Canvas(self._cpu_f, height=8, bg=self.BG, highlightthickness=0)
         self._cpu_bar.pack(fill=tk.X)
 
+        self._cpu_chart = tk.Canvas(self._cpu_f, height=30, bg=self.CARD, highlightthickness=0)
+        self._cpu_chart.pack(fill=tk.X, pady=(2, 0))
+
         n = psutil.cpu_count(logical=True) or 4
         cols = min(n, 16)
         self._cpu_g = tk.Frame(self._cpu_f, bg=self.CARD)
@@ -281,6 +303,9 @@ class SysMon:
         self._cpu_f.config(bg=bg)
         self._bar(self._cpu_bar, pct, fg)
 
+        self._cpu_hist.append(pct)
+        self._draw_chart(self._cpu_chart, self._cpu_hist, self.GRN)
+
         for i, cp in enumerate(cores):
             if i >= len(self._cpu_cells):
                 break
@@ -312,6 +337,9 @@ class SysMon:
 
         self._gpu_bar = tk.Canvas(self._gpu_f, height=8, bg=self.BG, highlightthickness=0)
         self._gpu_bar.pack(fill=tk.X)
+
+        self._gpu_chart = tk.Canvas(self._gpu_f, height=30, bg=self.CARD, highlightthickness=0)
+        self._gpu_chart.pack(fill=tk.X, pady=(2, 0))
 
         tags = tk.Frame(self._gpu_f, bg=self.CARD)
         tags.pack(fill=tk.X, pady=(4, 0))
@@ -346,6 +374,8 @@ class SysMon:
         self._gpu_vrm.config(text=f"{vu:.0f}/{vt:.0f}M")
         self._gpu_f.config(bg=bg)
         self._bar(self._gpu_bar, g3d, fg)
+        self._gpu_hist.append(g3d)
+        self._draw_chart(self._gpu_chart, self._gpu_hist, self.GRN)
         vals = {"3D": (f"{g3d:.0f}%", fg), "MEM": (f"{gmem:.0f}%", self.BLU),
                 "Enc": (f"{genc:.0f}%", self.PNK), "Dec": (f"{gdec:.0f}%", self.CYN)}
         for k, (v, c) in vals.items():
@@ -389,9 +419,9 @@ class SysMon:
         row1.pack(fill=tk.X, pady=(0, 2))
         self._nd = tk.Label(row1, bg=self.CARD, fg=self.GRN,
                             font=("Consolas", 10, "bold"))
-        self._nd.pack(side=tk.LEFT, padx=(0, 8))
+        self._nd.pack(side=tk.LEFT, padx=(0, 4))
         self._ndt = tk.Label(row1, bg=self.CARD, fg=self.DIM,
-                             font=("Consolas", 8))
+                             font=("Consolas", 8), width=9, anchor="e")
         self._ndt.pack(side=tk.RIGHT)
         self._nd_bar = tk.Canvas(row1, height=6, bg=self.BG, highlightthickness=0)
         self._nd_bar.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
@@ -400,9 +430,9 @@ class SysMon:
         row2.pack(fill=tk.X, pady=(0, 2))
         self._nu = tk.Label(row2, bg=self.CARD, fg=self.ORG,
                             font=("Consolas", 10, "bold"))
-        self._nu.pack(side=tk.LEFT, padx=(0, 8))
+        self._nu.pack(side=tk.LEFT, padx=(0, 4))
         self._nut = tk.Label(row2, bg=self.CARD, fg=self.DIM,
-                             font=("Consolas", 8))
+                             font=("Consolas", 8), width=9, anchor="e")
         self._nut.pack(side=tk.RIGHT)
         self._nu_bar = tk.Canvas(row2, height=6, bg=self.BG, highlightthickness=0)
         self._nu_bar.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
@@ -601,7 +631,7 @@ class SysMon:
     def _place(self):
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        self.root.geometry(f"380x560+{sw - 400}+{sh - 620}")
+        self.root.geometry(f"380x640+{sw - 400}+{sh - 700}")
 
     def _toggle_pin(self, e=None):
         cur = self.root.attributes("-topmost")
