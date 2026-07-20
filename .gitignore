@@ -1,10 +1,16 @@
+# Only SysMon belongs in this repo
+/*
+!/SysMon/
+!/.github/
+!/README.md
+!/.gitignore
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
-*.egg-info/
 
-# Build artifacts
+# Build
 build/
 dist/
 *.spec
@@ -15,6 +21,3 @@ dist/
 # OS
 Thumbs.db
 .DS_Store
-
-# Temp
-cookies.txt
