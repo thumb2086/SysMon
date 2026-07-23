@@ -62,7 +62,7 @@ def save_daily(data):
 
 
 def get_installed_apps():
-    apps = []
+    apps = {}
     paths = [
         r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
         r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
@@ -74,14 +74,19 @@ def get_installed_apps():
                 try:
                     sk = winreg.OpenKey(k, winreg.EnumKey(k, i))
                     name, _ = winreg.QueryValueEx(sk, "DisplayName")
-                    apps.append(name)
+                    version = ""
+                    try:
+                        version, _ = winreg.QueryValueEx(sk, "DisplayVersion")
+                    except Exception:
+                        pass
+                    apps[name] = version
                     winreg.CloseKey(sk)
                 except Exception:
                     pass
             winreg.CloseKey(k)
         except Exception:
             pass
-    return sorted(set(apps))
+    return sorted(apps.items())
 
 
 def is_autostart():
@@ -199,6 +204,7 @@ class SysMon:
         self._autostart_enabled = is_autostart()
 
         self._build()
+        self._upd_daily_hist()
         self._place()
         self._rebuild_disk()
         self._bg_probe_all()
@@ -414,13 +420,26 @@ class SysMon:
             pass
 
     def _build_daily(self, p):
-        self._daily_f, self._daily_h = self._section(p, "TODAY")
-        self._daily_dn = tk.Label(self._daily_h, bg=self.CARD, fg=self.GRN,
-                                  font=("Consolas", 10, "bold"))
-        self._daily_dn.pack(side=tk.LEFT, padx=(6, 4))
-        self._daily_up = tk.Label(self._daily_h, bg=self.CARD, fg=self.ORG,
-                                  font=("Consolas", 10, "bold"))
-        self._daily_up.pack(side=tk.LEFT, padx=(0, 4))
+        self._daily_f, self._daily_h = self._section(p, "TODAY TRAFFIC")
+        row1 = tk.Frame(self._daily_f, bg=self.CARD)
+        row1.pack(fill=tk.X)
+        tk.Label(row1, text="▼ Download", bg=self.CARD, fg=self.GRN,
+                 font=("Consolas", 7, "bold"), width=10, anchor="w").pack(side=tk.LEFT)
+        self._daily_dn = tk.Label(row1, bg=self.CARD, fg=self.GRN,
+                                  font=("Consolas", 12, "bold"))
+        self._daily_dn.pack(side=tk.LEFT)
+        tk.Label(row1, text="▲ Upload", bg=self.CARD, fg=self.ORG,
+                 font=("Consolas", 7, "bold"), width=10, anchor="w").pack(side=tk.LEFT, padx=(10, 0))
+        self._daily_up = tk.Label(row1, bg=self.CARD, fg=self.ORG,
+                                  font=("Consolas", 12, "bold"))
+        self._daily_up.pack(side=tk.LEFT)
+
+        self._daily_hist_f = tk.Frame(self._daily_f, bg=self.CARD)
+        self._daily_hist_f.pack(fill=tk.X, pady=(2, 0))
+        self._daily_hist_txt = tk.Text(self._daily_hist_f, height=3, bg=self.CARD, fg=self.TXT,
+                                       font=("Consolas", 6), highlightthickness=0, relief=tk.FLAT)
+        self._daily_hist_txt.pack(fill=tk.X)
+        self._daily_hist_txt.config(state=tk.DISABLED)
 
     def _upd_daily(self, io):
         today = fmt_date()
@@ -429,14 +448,25 @@ class SysMon:
             self._daily_dn_baseline = io.bytes_recv
             self._daily_up_baseline = io.bytes_sent
             self._today = today
+            self._upd_daily_hist()
         if self._daily_dn_baseline == 0:
             self._daily_dn_baseline = io.bytes_recv
             self._daily_up_baseline = io.bytes_sent
         dn_delta = max(0, io.bytes_recv - self._daily_dn_baseline)
         up_delta = max(0, io.bytes_sent - self._daily_up_baseline)
         self._daily[today] = {"dn": dn_delta, "up": up_delta}
-        self._daily_dn.config(text=f"▼ {fmt_bytes(dn_delta)}")
-        self._daily_up.config(text=f"▲ {fmt_bytes(up_delta)}")
+        self._daily_dn.config(text=f"{fmt_bytes(dn_delta)}")
+        self._daily_up.config(text=f"{fmt_bytes(up_delta)}")
+
+    def _upd_daily_hist(self):
+        self._daily_hist_txt.config(state=tk.NORMAL)
+        self._daily_hist_txt.delete("1.0", tk.END)
+        days = sorted(self._daily.items(), reverse=True)[:5]
+        lines = []
+        for d, v in days:
+            lines.append(f"{d}  ▼ {fmt_bytes(v.get('dn',0))}  ▲ {fmt_bytes(v.get('up',0))}")
+        self._daily_hist_txt.insert("1.0", "\n".join(lines))
+        self._daily_hist_txt.config(state=tk.DISABLED)
 
     def _build_cpu(self, p):
         self._cpu_f, self._cpu_h = self._section(p, "CPU")
@@ -833,16 +863,26 @@ class SysMon:
 
     def _build_apps(self, p):
         self._apps_f, _ = self._section(p, f"APPS ({len(self._installed_apps)})")
+        f = tk.Frame(self._apps_f, bg=self.CARD)
+        f.pack(fill=tk.X)
+        tk.Label(f, text="Name", bg=self.CARD, fg=self.DIM,
+                 font=("Consolas", 6, "bold"), width=35, anchor="w").pack(side=tk.LEFT)
+        tk.Label(f, text="Version", bg=self.CARD, fg=self.DIM,
+                 font=("Consolas", 6, "bold"), width=12, anchor="e").pack(side=tk.RIGHT)
         txt = tk.Text(self._apps_f, height=4, bg=self.CARD, fg=self.TXT,
                       font=("Consolas", 6), highlightthickness=0, relief=tk.FLAT)
         txt.pack(fill=tk.X)
-        txt.insert("1.0", "\n".join(self._installed_apps[:60]))
+        lines = []
+        for name, ver in self._installed_apps[:60]:
+            ver_str = ver or ""
+            lines.append(f"{name:<48}{ver_str:>8}")
+        txt.insert("1.0", "\n".join(lines))
         txt.config(state=tk.DISABLED)
 
     def _place(self):
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        self.root.geometry(f"420x780+{sw - 440}+{sh - 840}")
+        self.root.geometry(f"960x540+{sw - 980}+{sh - 580}")
 
     def _toggle_pin(self, e=None):
         cur = self.root.attributes("-topmost")
