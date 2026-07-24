@@ -4,6 +4,7 @@ import subprocess
 import time
 import threading
 import ctypes
+import ctypes.wintypes
 import json
 import os
 import sys
@@ -16,6 +17,52 @@ APP_NAME = "SysMon"
 APP_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
 DAILY_FILE = os.path.join(APP_DIR, "daily.json")
 AUTOSTART_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+# ── System Tray ──
+_NIM_ADD = 0
+_NIM_MODIFY = 1
+_NIM_DELETE = 2
+_NIF_MESSAGE = 1
+_NIF_ICON = 2
+_NIF_TIP = 4
+_WM_USER = 0x400
+_WM_TRAY = _WM_USER + 100
+_WM_LBUTTONDBLCLK = 0x203
+_WM_RBUTTONUP = 0x205
+
+class _NOTIFYICONDATAW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.wintypes.DWORD),
+        ("hWnd", ctypes.wintypes.HWND),
+        ("uID", ctypes.wintypes.UINT),
+        ("uFlags", ctypes.wintypes.UINT),
+        ("uCallbackMessage", ctypes.wintypes.UINT),
+        ("hIcon", ctypes.wintypes.HANDLE),
+        ("szTip", ctypes.wintypes.WCHAR * 128),
+        ("dwState", ctypes.wintypes.DWORD),
+        ("dwStateMask", ctypes.wintypes.DWORD),
+        ("szInfo", ctypes.wintypes.WCHAR * 256),
+        ("uVersion", ctypes.wintypes.UINT),
+        ("szInfoTitle", ctypes.wintypes.WCHAR * 64),
+        ("dwInfoFlags", ctypes.wintypes.DWORD),
+        ("guidItem", ctypes.c_byte * 16),
+        ("hBalloonIcon", ctypes.wintypes.HANDLE),
+    ]
+
+def _tray_icon(hwnd, tip, add=True):
+    nid = _NOTIFYICONDATAW()
+    nid.cbSize = ctypes.sizeof(_NOTIFYICONDATAW)
+    nid.hWnd = hwnd
+    nid.uID = 1
+    nid.uFlags = _NIF_MESSAGE | _NIF_TIP
+    nid.uCallbackMessage = _WM_TRAY
+    nid.szTip = tip[:127]
+    shell32 = ctypes.windll.shell32
+    if add:
+        shell32.Shell_NotifyIconW(_NIM_ADD, ctypes.byref(nid))
+    else:
+        shell32.Shell_NotifyIconW(_NIM_DELETE, ctypes.byref(nid))
+    return nid
 
 
 def fmt_spd(bps):
@@ -209,6 +256,7 @@ class SysMon:
         self._rebuild_disk()
         self._bg_probe_all()
         self._bg_daily_log()
+        self._setup_tray()
         self._tick()
 
     def _probe_gpu(self):
@@ -412,10 +460,67 @@ class SysMon:
         set_autostart(self._autostart_enabled)
         self._upd_auto_btn()
 
-    def _minimize_to_tray(self):
-        self.root.withdraw()
+    def _setup_tray(self):
+        self.root.protocol("WM_DELETE_WINDOW", self._minimize_to_tray)
+        self._tray_nid = None
+        self._tray_hwnd = None
         try:
-            ctypes.windll.user32.ShowWindow(ctypes.windll.user32.GetParent(self.root.winfo_id()), 0)
+            self._tray_hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            self._tray_nid = _tray_icon(self._tray_hwnd, APP_NAME, add=True)
+            self._bind_tray()
+        except Exception:
+            pass
+
+    def _show_from_tray(self):
+        try:
+            ctypes.windll.user32.ShowWindow(self._tray_hwnd, 1)
+            ctypes.windll.user32.SetForegroundWindow(self._tray_hwnd)
+        except Exception:
+            pass
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def _bind_tray(self):
+        try:
+            user32 = ctypes.windll.user32
+            old_wndproc = user32.GetWindowLongW(self._tray_hwnd, -4)
+            tray_cb = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.wintypes.HWND, ctypes.wintypes.UINT, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+
+            def wndproc(hwnd, msg, wp, lp):
+                if msg == _WM_TRAY:
+                    if wp == 1:
+                        if lp == _WM_LBUTTONDBLCLK:
+                            self._show_from_tray()
+                        elif lp == _WM_RBUTTONUP:
+                            self._show_tray_menu()
+                return ctypes.windll.user32.CallWindowProcW(old_wndproc, hwnd, msg, wp, lp)
+
+            self._tray_proc = tray_cb(wndproc)
+            user32.SetWindowLongW(self._tray_hwnd, -4, self._tray_proc)
+        except Exception:
+            pass
+
+    def _show_tray_menu(self):
+        try:
+            m = tk.Menu(self.root, tearoff=0, bg=self.CARD, fg=self.TXT,
+                        font=("Segoe UI", 9))
+            m.add_command(label="Show SysMon", command=self._show_from_tray)
+            m.add_command(label="Exit", command=self._exit_app)
+            x, y = ctypes.windll.user32.GetCursorPos()
+            m.tk_popup(x, y)
+        except Exception:
+            pass
+
+    def _exit_app(self):
+        if self._tray_hwnd and self._tray_nid:
+            _tray_icon(self._tray_hwnd, "", add=False)
+        self.root.quit()
+
+    def _minimize_to_tray(self):
+        try:
+            self.root.withdraw()
+            ctypes.windll.user32.ShowWindow(self._tray_hwnd, 0)
         except Exception:
             pass
 
@@ -914,8 +1019,12 @@ class SysMon:
         self.root.after(500, self._tick)
 
     def run(self):
-        self.root.mainloop()
-        save_daily(self._daily)
+        try:
+            self.root.mainloop()
+        finally:
+            save_daily(self._daily)
+            if self._tray_hwnd and self._tray_nid:
+                _tray_icon(self._tray_hwnd, "", add=False)
 
 
 if __name__ == "__main__":
