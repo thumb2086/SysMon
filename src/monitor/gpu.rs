@@ -9,7 +9,7 @@ pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
     match output {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);
-            let lines: Vec<&str> = lines.trim().lines().collect();
+            let lines: Vec<&str> = stdout.trim().lines().collect();
             
             if lines.len() > 1 {
                 let parts: Vec<&str> = lines[1].split_whitespace().collect();

@@ -14,8 +14,9 @@ egui_extras = { version = "0.28", features = ["all"] }
 # System monitoring
 sysinfo = "0.31"
 
-# GPU monitoring (Windows)
-nvapi = "0.3"
+# GPU monitoring
+[target.'cfg(windows)'.dependencies]
+nvapi = "0.1"
 
 # Database
 rusqlite = { version = "0.31", features = ["bundled"] }
