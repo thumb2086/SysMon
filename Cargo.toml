@@ -9,7 +9,7 @@ description = "Lightweight system monitor with network traffic tracking"
 # GUI
 eframe = "0.28"
 egui = "0.28"
-egui_extras = { version = "0.28", features = ["all"] }
+egui_extras = "0.28"
 
 # System monitoring
 sysinfo = "0.31"
