@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::monitor::SystemInfo;
 use crate::storage::Database;
 use crate::alerts::{AlertManager, AlertAction};
+use chrono::Datelike;
 
 pub struct SysMonApp {
     config: Config,
@@ -37,6 +38,9 @@ impl SysMonApp {
         let now = chrono::Utc::now();
         let daily_traffic = db.get_daily_traffic(now.date_naive());
         
+        let last_network_sent = sys_info.network_sent;
+        let last_network_recv = sys_info.network_received;
+        
         SysMonApp {
             alert_manager: AlertManager::new(config.alerts.clone()),
             config,
@@ -45,8 +49,8 @@ impl SysMonApp {
             current_tab: Tab::Dashboard,
             network_sent: daily_traffic.total_sent,
             network_recv: daily_traffic.total_received,
-            last_network_sent: sys_info.network_sent,
-            last_network_recv: sys_info.network_received,
+            last_network_sent,
+            last_network_recv,
             network_sent_rate: 0,
             network_recv_rate: 0,
             last_record_time: std::time::Instant::now(),

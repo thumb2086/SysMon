@@ -26,7 +26,7 @@ pub fn render(
             header.col(|ui| { ui.strong("Memory"); });
         })
         .body(|mut body| {
-            let mut processes: Vec<_> = sys_info.sys.processes().collect();
+            let mut processes: Vec<_> = sys_info.sys.processes().into_iter().collect();
             processes.sort_by(|a, b| b.1.cpu_usage().partial_cmp(&a.1.cpu_usage()).unwrap());
             
             for (pid, proc_info) in processes.iter().take(50) {

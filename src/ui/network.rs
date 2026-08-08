@@ -2,6 +2,7 @@ use eframe::egui;
 use crate::storage::Database;
 use crate::config::Config;
 use super::{progress_bar, format_bytes};
+use chrono::Datelike;
 
 pub fn render(
     ui: &mut egui::Ui,
@@ -92,7 +93,7 @@ pub fn render(
 
     ui.add_space(8.0);
 
-    // History chart placeholder
+    // History chart
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
         ui.heading("Traffic History (7 days)");
@@ -104,7 +105,6 @@ pub fn render(
                 ui.label("No data available yet");
             });
         } else {
-            // Simple bar chart
             let max_bytes = history.iter()
                 .map(|d| d.total_bytes)
                 .max()
