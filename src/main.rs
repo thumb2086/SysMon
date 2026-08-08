@@ -8,12 +8,26 @@ mod alerts;
 mod ui;
 
 use single_instance::SingleInstance;
+use std::fs;
+use std::path::PathBuf;
+
+const DEFAULT_CONFIG: &str = include_str!("../config.toml");
 
 fn main() {
     let instance = SingleInstance::new("SysMon_SingleInstance").unwrap();
     if !instance.is_single() {
         eprintln!("SysMon is already running!");
         return;
+    }
+
+    // Ensure data directory exists
+    let data_dir = PathBuf::from("data");
+    fs::create_dir_all(&data_dir).ok();
+
+    // Ensure config exists
+    let config_path = PathBuf::from("config.toml");
+    if !config_path.exists() {
+        fs::write(&config_path, DEFAULT_CONFIG).ok();
     }
 
     let config = config::Config::load();
@@ -31,12 +45,8 @@ fn main() {
         "SysMon",
         options,
         Box::new(|cc| {
-            setup_custom_fonts(&cc.egui_ctx);
+            cc.egui_ctx.set_fonts(egui::FontDefinitions::default());
             Ok(Box::new(app::SysMonApp::new(config)))
         }),
     ).unwrap();
-}
-
-fn setup_custom_fonts(ctx: &egui::Context) {
-    ctx.set_fonts(egui::FontDefinitions::default());
 }
