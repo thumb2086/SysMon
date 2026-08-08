@@ -5,7 +5,6 @@ mod config;
 mod monitor;
 mod storage;
 mod alerts;
-mod tray;
 mod ui;
 
 use single_instance::SingleInstance;
@@ -21,9 +20,10 @@ fn main() {
     
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([480.0, 600.0])
+            .with_inner_size([500.0, 650.0])
             .with_min_inner_size([400.0, 500.0])
-            .with_title("SysMon"),
+            .with_decorations(true)
+            .with_resizable(true),
         ..Default::default()
     };
 
@@ -38,6 +38,5 @@ fn main() {
 }
 
 fn setup_custom_fonts(ctx: &egui::Context) {
-    let _fonts = egui::FontDefinitions::default();
     ctx.set_fonts(egui::FontDefinitions::default());
 }
