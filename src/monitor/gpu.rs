@@ -2,7 +2,6 @@
 pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
     use std::process::Command;
     
-    // Try nvidia-smi first (more reliable)
     let output = Command::new("nvidia-smi")
         .args(&["--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"])
         .output();
@@ -13,14 +12,13 @@ pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
             let parts: Vec<&str> = stdout.trim().split(", ").collect();
             if parts.len() >= 3 {
                 let usage = parts[0].parse::<f32>().ok();
-                let mem_used = parts[1].parse::<u64>().ok().map(|v| v * 1024 * 1024); // MB to bytes
+                let mem_used = parts[1].parse::<u64>().ok().map(|v| v * 1024 * 1024);
                 let mem_total = parts[2].parse::<u64>().ok().map(|v| v * 1024 * 1024);
                 return (usage, mem_used, mem_total);
             }
         }
     }
     
-    // Fallback to wmic
     let output = Command::new("wmic")
         .args(&["path", "win32_videocontroller", "get", "AdapterRAM,Utilization"])
         .output();
@@ -44,7 +42,12 @@ pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
     }
 }
 
-/// Get per-process GPU usage using nvidia-smi
+#[cfg(not(target_os = "windows"))]
+pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
+    (None, None, None)
+}
+
+#[cfg(target_os = "windows")]
 pub fn get_process_gpu_usage() -> Vec<(u32, String, f32)> {
     use std::process::Command;
     
@@ -62,7 +65,6 @@ pub fn get_process_gpu_usage() -> Vec<(u32, String, f32)> {
                 if parts.len() >= 3 {
                     if let Ok(pid) = parts[0].parse::<u32>() {
                         let name = parts[1].to_string();
-                        // Note: used_memory is in MiB, we'll use it as approximate GPU usage indicator
                         let mem = parts[1].parse::<f32>().unwrap_or(0.0);
                         result.push((pid, name, mem));
                     }
@@ -72,11 +74,6 @@ pub fn get_process_gpu_usage() -> Vec<(u32, String, f32)> {
     }
     
     result
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
-    (None, None, None)
 }
 
 #[cfg(not(target_os = "windows"))]

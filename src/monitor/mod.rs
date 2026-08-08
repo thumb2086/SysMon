@@ -36,7 +36,7 @@ impl SystemInfo {
 
     pub fn update(&mut self) {
         self.sys.refresh_all();
-        self.networks.refresh(true);
+        self.networks.refresh();
         
         self.cpu_usage = cpu::get_cpu_usage(&mut self.sys);
         let mem = memory::get_memory_info(&self.sys);
