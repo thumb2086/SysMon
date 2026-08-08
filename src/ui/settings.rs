@@ -93,6 +93,7 @@ pub fn render(
     });
 }
 
+#[cfg(target_os = "windows")]
 fn set_autostart(enable: bool) {
     use winreg::enums::*;
     use winreg::RegKey;
@@ -111,4 +112,9 @@ fn set_autostart(enable: bool) {
             key.delete_value("SysMon").ok();
         }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_autostart(_enable: bool) {
+    // Auto-start not implemented for non-Windows platforms
 }
