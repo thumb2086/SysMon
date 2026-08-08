@@ -1,11 +1,14 @@
 use eframe::egui;
 use crate::monitor::SystemInfo;
+use crate::monitor::cpu::CpuMonitor;
 use crate::storage::Database;
 use crate::config::Config;
 use super::{progress_bar, format_bytes, format_speed};
+use std::sync::Arc;
 
 pub fn render(
     ui: &mut egui::Ui,
+    cpu_monitor: &Arc<CpuMonitor>,
     sys_info: &SystemInfo,
     db: &Database,
     config: &Config,
@@ -15,17 +18,18 @@ pub fn render(
     ui.heading("Dashboard");
     ui.separator();
 
-    // CPU & Memory cards
+    // Get CPU from background monitor
+    let cpu_usage = cpu_monitor.get_usage();
+    let avg_cpu = if cpu_usage.is_empty() {
+        0.0
+    } else {
+        cpu_usage.iter().sum::<f32>() / cpu_usage.len() as f32
+    };
+
     ui.columns(2, |cols| {
-        // CPU
         cols[0].group(|ui| {
             ui.set_min_width(ui.available_width());
             ui.label("CPU");
-            let avg_cpu = if sys_info.cpu_usage.is_empty() {
-                0.0
-            } else {
-                sys_info.cpu_usage.iter().sum::<f32>() / sys_info.cpu_usage.len() as f32
-            };
             let cpu_color = if avg_cpu >= 80.0 {
                 egui::Color32::from_rgb(243, 139, 168)
             } else if avg_cpu >= 50.0 {
@@ -37,7 +41,6 @@ pub fn render(
             ui.label(format!("{:.1}%", avg_cpu));
         });
 
-        // Memory
         cols[1].group(|ui| {
             ui.set_min_width(ui.available_width());
             ui.label("Memory");
@@ -63,7 +66,6 @@ pub fn render(
 
     ui.add_space(8.0);
 
-    // GPU (if available)
     if config.interface.show_gpu {
         if let Some(gpu_usage) = sys_info.gpu_usage {
             ui.group(|ui| {
@@ -87,7 +89,6 @@ pub fn render(
         }
     }
 
-    // Network traffic card
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
         ui.heading("Network Traffic (Today)");
@@ -100,14 +101,6 @@ pub fn render(
             daily_traffic.total_bytes as f64 / daily_limit as f64
         } else {
             0.0
-        };
-        
-        let _status_color = if daily_pct >= 0.95 {
-            egui::Color32::from_rgb(243, 139, 168)
-        } else if daily_pct >= 0.8 {
-            egui::Color32::from_rgb(249, 226, 175)
-        } else {
-            egui::Color32::from_rgb(166, 227, 161)
         };
         
         ui.horizontal(|ui| {
@@ -144,16 +137,16 @@ pub fn render(
 
     ui.add_space(8.0);
 
-    // CPU cores usage
+    // CPU cores
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
         ui.label("CPU Cores");
         
-        let num_cores = sys_info.cpu_usage.len();
+        let num_cores = cpu_usage.len();
         let cols = (num_cores as f32).sqrt().ceil() as usize;
         let cols = cols.max(1);
         ui.columns(cols, |columns| {
-            for (i, usage) in sys_info.cpu_usage.iter().enumerate() {
+            for (i, usage) in cpu_usage.iter().enumerate() {
                 let col_idx = i % cols;
                 columns[col_idx].horizontal(|ui| {
                     ui.label(format!("C{}", i));

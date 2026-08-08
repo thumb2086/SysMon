@@ -1,9 +1,12 @@
 use eframe::egui;
 use crate::monitor::SystemInfo;
+use crate::monitor::cpu::CpuMonitor;
 use super::format_bytes;
+use std::sync::Arc;
 
 pub fn render(
     ui: &mut egui::Ui,
+    cpu_monitor: &Arc<CpuMonitor>,
     sys_info: &SystemInfo,
 ) {
     ui.heading("Processes");

@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::config::Config;
 use crate::monitor::SystemInfo;
+use crate::monitor::cpu::CpuMonitor;
 use crate::storage::Database;
 use crate::alerts::{AlertManager, AlertAction};
 use chrono::Datelike;
@@ -8,6 +9,7 @@ use chrono::Datelike;
 pub struct SysMonApp {
     config: Config,
     sys_info: SystemInfo,
+    cpu_monitor: Arc<CpuMonitor>,
     db: Database,
     alert_manager: AlertManager,
     current_tab: Tab,
@@ -20,8 +22,10 @@ pub struct SysMonApp {
     last_record_time: std::time::Instant,
     last_day: chrono::NaiveDate,
     last_threshold_check: std::time::Instant,
-    cached_monthly_traffic: Option<(i32, u32, u64)>, // (year, month, total_bytes)
+    cached_monthly_traffic: Option<(i32, u32, u64)>,
 }
+
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Tab {
@@ -46,6 +50,7 @@ impl SysMonApp {
         SysMonApp {
             alert_manager: AlertManager::new(config.alerts.clone()),
             config,
+            cpu_monitor: Arc::new(CpuMonitor::new()),
             sys_info,
             db,
             current_tab: Tab::Dashboard,
@@ -63,9 +68,8 @@ impl SysMonApp {
     }
 
     fn update_network_rates(&mut self) {
-        self.sys_info.update();
+        self.sys_info.update_network();
         
-        // Calculate network rates
         if self.sys_info.network_sent >= self.last_network_sent {
             self.network_sent_rate = self.sys_info.network_sent - self.last_network_sent;
         }
@@ -76,29 +80,23 @@ impl SysMonApp {
         self.last_network_sent = self.sys_info.network_sent;
         self.last_network_recv = self.sys_info.network_received;
         
-        // Update daily totals
         self.network_sent += self.network_sent_rate;
         self.network_recv += self.network_recv_rate;
     }
 
     fn check_alerts(&mut self) {
-        // Only check alerts every 5 seconds to reduce DB queries
         if self.last_threshold_check.elapsed() < std::time::Duration::from_secs(5) {
             return;
         }
         self.last_threshold_check = std::time::Instant::now();
         
-        // Check for day change
         let today = chrono::Utc::now().date_naive();
         if today != self.last_day {
             self.alert_manager.reset_daily_alerts();
             self.last_day = today;
         }
         
-        // Check thresholds
         let daily_limit = self.config.daily_limit_bytes();
-        
-        // Cache monthly traffic query
         let now = chrono::Utc::now();
         let current_year = now.year();
         let current_month = now.month();
@@ -108,15 +106,13 @@ impl SysMonApp {
                 *bytes
             } else {
                 let traffic = self.db.get_monthly_traffic(current_year, current_month);
-                let bytes = traffic.total_bytes;
-                self.cached_monthly_traffic = Some((current_year, current_month, bytes));
-                bytes
+                self.cached_monthly_traffic = Some((current_year, current_month, traffic.total_bytes));
+                traffic.total_bytes
             }
         } else {
             let traffic = self.db.get_monthly_traffic(current_year, current_month);
-            let bytes = traffic.total_bytes;
-            self.cached_monthly_traffic = Some((current_year, current_month, bytes));
-            bytes
+            self.cached_monthly_traffic = Some((current_year, current_month, traffic.total_bytes));
+            traffic.total_bytes
         };
         
         let monthly_limit = self.config.monthly_limit_bytes();
@@ -151,14 +147,12 @@ impl SysMonApp {
 
 impl eframe::App for SysMonApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Only repaint when needed - use longer interval
-        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
         
         self.update_network_rates();
         self.check_alerts();
         self.record_traffic();
 
-        // Top panel with tabs
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("SysMon");
@@ -179,11 +173,11 @@ impl eframe::App for SysMonApp {
             });
         });
 
-        // Main content
         egui::CentralPanel::default().show(ctx, |ui| {
             match self.current_tab {
                 Tab::Dashboard => crate::ui::dashboard::render(
                     ui,
+                    &self.cpu_monitor,
                     &self.sys_info,
                     &self.db,
                     &self.config,
@@ -197,6 +191,7 @@ impl eframe::App for SysMonApp {
                 ),
                 Tab::Processes => crate::ui::processes::render(
                     ui,
+                    &self.cpu_monitor,
                     &self.sys_info,
                 ),
                 Tab::Settings => crate::ui::settings::render(

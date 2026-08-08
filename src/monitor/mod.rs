@@ -8,7 +8,6 @@ use sysinfo::{System, Networks};
 pub struct SystemInfo {
     pub sys: System,
     pub networks: Networks,
-    pub cpu_usage: Vec<f32>,
     pub memory_used: u64,
     pub memory_total: u64,
     pub gpu_usage: Option<f32>,
@@ -23,7 +22,6 @@ impl SystemInfo {
         SystemInfo {
             sys: System::new_all(),
             networks: Networks::new_with_refreshed_list(),
-            cpu_usage: Vec::new(),
             memory_used: 0,
             memory_total: 0,
             gpu_usage: None,
@@ -35,10 +33,13 @@ impl SystemInfo {
     }
 
     pub fn update(&mut self) {
-        self.sys.refresh_all();
+        self.update_network();
+    }
+    
+    pub fn update_network(&mut self) {
+        self.sys.refresh_memory();
         self.networks.refresh();
         
-        self.cpu_usage = cpu::get_cpu_usage(&mut self.sys);
         let mem = memory::get_memory_info(&self.sys);
         self.memory_used = mem.0;
         self.memory_total = mem.1;

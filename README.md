@@ -8,27 +8,48 @@ Lightweight system monitor with network traffic tracking.
 - Network traffic tracking with daily/monthly limits
 - Alert notifications when limits reached
 - Auto-disconnect when limit exceeded
-- System tray integration
+- SQLite database for history
+- Minimalist dark theme UI
 - Auto-start with Windows
 - Single instance only
 
-## Build
+## Download
+
+Download the latest release from: https://github.com/thumb2086/SysMon/releases
+
+### Windows
+
+- `sysmon.exe` - Standalone executable
+- Run `installer\install.bat` as Administrator to install
+
+### Linux
 
 ```bash
-cargo build --release
+chmod +x sysmon
+./sysmon
 ```
 
-## Usage
+### macOS
 
-Run `sysmon.exe` (Windows) or `sysmon` (Linux/macOS).
+```bash
+chmod +x sysmon
+./sysmon
+```
 
 ## Configuration
 
 Edit `config.toml` to customize:
-- Traffic limits
+
+- Traffic limits (daily/monthly)
 - Alert thresholds
 - Interface theme
 - Auto-start settings
+
+## Building from Source
+
+```bash
+cargo build --release
+```
 
 ## License
 
