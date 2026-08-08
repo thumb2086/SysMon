@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::{Duration, Instant};
 
 static mut GPU_CACHE: Option<(Instant, Option<f32>, Option<u64>, Option<u64>)> = None;
@@ -34,10 +32,13 @@ pub fn get_gpu_info() -> (Option<f32>, Option<u64>, Option<u64>) {
 #[cfg(target_os = "windows")]
 fn get_gpu_info_inner() -> (Option<f32>, Option<u64>, Option<u64>) {
     use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     
     let output = Command::new("nvidia-smi")
         .args(&["--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
     
     if let Ok(out) = output {
@@ -85,12 +86,15 @@ pub fn get_process_gpu_usage() -> Vec<(u32, String, f32)> {
 #[cfg(target_os = "windows")]
 fn get_process_gpu_usage_inner() -> Vec<(u32, String, f32)> {
     use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     
     let mut result = Vec::new();
     
     let output = Command::new("nvidia-smi")
         .args(&["--query-compute-apps=pid,used_memory,name", "--format=csv,noheader,nounits"])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
     
     if let Ok(out) = output {
