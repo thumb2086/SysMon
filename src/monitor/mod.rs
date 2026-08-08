@@ -3,10 +3,11 @@ pub mod memory;
 pub mod gpu;
 pub mod network;
 
-use sysinfo::System;
+use sysinfo::{System, Networks};
 
 pub struct SystemInfo {
     pub sys: System,
+    pub networks: Networks,
     pub cpu_usage: Vec<f32>,
     pub memory_used: u64,
     pub memory_total: u64,
@@ -21,6 +22,7 @@ impl SystemInfo {
     pub fn new() -> Self {
         SystemInfo {
             sys: System::new_all(),
+            networks: Networks::new_with_refreshed_list(),
             cpu_usage: Vec::new(),
             memory_used: 0,
             memory_total: 0,
@@ -34,6 +36,7 @@ impl SystemInfo {
 
     pub fn update(&mut self) {
         self.sys.refresh_all();
+        self.networks.refresh(true);
         
         self.cpu_usage = cpu::get_cpu_usage(&mut self.sys);
         let mem = memory::get_memory_info(&self.sys);
@@ -45,7 +48,7 @@ impl SystemInfo {
         self.gpu_memory_used = gpu.1;
         self.gpu_memory_total = gpu.2;
         
-        let net = network::get_network_traffic(&self.sys);
+        let net = network::get_network_traffic(&self.networks);
         self.network_sent = net.0;
         self.network_received = net.1;
     }

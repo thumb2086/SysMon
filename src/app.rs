@@ -19,6 +19,8 @@ pub struct SysMonApp {
     network_recv_rate: u64,
     last_record_time: std::time::Instant,
     last_day: chrono::NaiveDate,
+    last_threshold_check: std::time::Instant,
+    cached_monthly_traffic: Option<(i32, u32, u64)>, // (year, month, total_bytes)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,10 +57,12 @@ impl SysMonApp {
             network_recv_rate: 0,
             last_record_time: std::time::Instant::now(),
             last_day: now.date_naive(),
+            last_threshold_check: std::time::Instant::now(),
+            cached_monthly_traffic: None,
         }
     }
 
-    fn update_system_info(&mut self) {
+    fn update_network_rates(&mut self) {
         self.sys_info.update();
         
         // Calculate network rates
@@ -75,6 +79,14 @@ impl SysMonApp {
         // Update daily totals
         self.network_sent += self.network_sent_rate;
         self.network_recv += self.network_recv_rate;
+    }
+
+    fn check_alerts(&mut self) {
+        // Only check alerts every 5 seconds to reduce DB queries
+        if self.last_threshold_check.elapsed() < std::time::Duration::from_secs(5) {
+            return;
+        }
+        self.last_threshold_check = std::time::Instant::now();
         
         // Check for day change
         let today = chrono::Utc::now().date_naive();
@@ -85,16 +97,34 @@ impl SysMonApp {
         
         // Check thresholds
         let daily_limit = self.config.daily_limit_bytes();
-        let monthly_traffic = self.db.get_monthly_traffic(
-            chrono::Utc::now().year(),
-            chrono::Utc::now().month()
-        );
+        
+        // Cache monthly traffic query
+        let now = chrono::Utc::now();
+        let current_year = now.year();
+        let current_month = now.month();
+        
+        let monthly_bytes = if let Some((y, m, bytes)) = &self.cached_monthly_traffic {
+            if *y == current_year && *m == current_month {
+                *bytes
+            } else {
+                let traffic = self.db.get_monthly_traffic(current_year, current_month);
+                let bytes = traffic.total_bytes;
+                self.cached_monthly_traffic = Some((current_year, current_month, bytes));
+                bytes
+            }
+        } else {
+            let traffic = self.db.get_monthly_traffic(current_year, current_month);
+            let bytes = traffic.total_bytes;
+            self.cached_monthly_traffic = Some((current_year, current_month, bytes));
+            bytes
+        };
+        
         let monthly_limit = self.config.monthly_limit_bytes();
         
         let action = self.alert_manager.check_thresholds(
             self.network_sent + self.network_recv,
             daily_limit,
-            monthly_traffic.total_bytes,
+            monthly_bytes,
             monthly_limit,
         );
         
@@ -121,12 +151,11 @@ impl SysMonApp {
 
 impl eframe::App for SysMonApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Update system info periodically
-        ctx.request_repaint_after(std::time::Duration::from_millis(
-            self.config.monitoring.update_interval_ms
-        ));
+        // Only repaint when needed - use longer interval
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
         
-        self.update_system_info();
+        self.update_network_rates();
+        self.check_alerts();
         self.record_traffic();
 
         // Top panel with tabs

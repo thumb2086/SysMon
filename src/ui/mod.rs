@@ -12,8 +12,9 @@ pub fn progress_bar(ui: &mut egui::Ui, value: f64, color: egui::Color32) {
     let rect = response.rect;
     let rounding = egui::Rounding::same(4.0);
     
-    // Background
-    painter.rect_filled(rect, rounding, egui::Color32::from_gray(40));
+    // Background - lighter gray that works in both themes
+    let bg_color = egui::Color32::from_rgb(220, 220, 220);
+    painter.rect_filled(rect, rounding, bg_color);
     
     // Progress
     let progress_rect = egui::Rect::from_min_size(
