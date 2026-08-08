@@ -30,13 +30,13 @@ pub fn render(
         });
         
         ui.horizontal(|ui| {
-            ui.label("Warning at (%):");
-            ui.add(egui::DragValue::new(&mut config.network.warning_threshold)
-                .speed(0.01)
-                .range(0.5..=0.99)
-                .factor(100.0)
+            ui.label("Warning threshold:");
+            let mut warning_pct = config.network.warning_threshold * 100.0;
+            ui.add(egui::DragValue::new(&mut warning_pct)
+                .speed(1.0)
+                .range(50.0..=99.0)
                 .suffix("%"));
-            config.network.warning_threshold /= 100.0;
+            config.network.warning_threshold = warning_pct / 100.0;
         });
     });
 
@@ -102,8 +102,11 @@ fn set_autostart(enable: bool) {
     
     if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_WRITE) {
         if enable {
-            let exe_path = std::env::current_exe().unwrap();
-            key.set_value("SysMon", &exe_path.to_str().unwrap()).ok();
+            if let Ok(exe_path) = std::env::current_exe() {
+                if let Some(path_str) = exe_path.to_str() {
+                    key.set_value("SysMon", &path_str).ok();
+                }
+            }
         } else {
             key.delete_value("SysMon").ok();
         }

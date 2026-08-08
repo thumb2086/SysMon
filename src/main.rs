@@ -9,7 +9,6 @@ mod tray;
 mod ui;
 
 use single_instance::SingleInstance;
-use std::sync::Mutex;
 
 fn main() {
     let instance = SingleInstance::new("SysMon_SingleInstance").unwrap();
@@ -39,6 +38,6 @@ fn main() {
 }
 
 fn setup_custom_fonts(ctx: &egui::Context) {
-    let mut fonts = egui::FontDefinitions::default();
-    ctx.set_fonts(fonts);
+    let _fonts = egui::FontDefinitions::default();
+    ctx.set_fonts(egui::FontDefinitions::default());
 }

@@ -36,7 +36,6 @@ impl SysMonApp {
         
         let now = chrono::Utc::now();
         let daily_traffic = db.get_daily_traffic(now.date_naive());
-        let monthly_traffic = db.get_monthly_traffic(now.year(), now.month());
         
         SysMonApp {
             alert_manager: AlertManager::new(config.alerts.clone()),

@@ -1,6 +1,6 @@
 [package]
 name = "sysmon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["SysMon"]
 description = "Lightweight system monitor with network traffic tracking"
@@ -14,20 +14,12 @@ egui_extras = "0.28"
 # System monitoring
 sysinfo = "0.31"
 
-# GPU monitoring
-[target.'cfg(windows)'.dependencies]
-nvapi = "0.1"
-
 # Database
 rusqlite = { version = "0.31", features = ["bundled"] }
 
 # Config
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-
-# tray icon
-tray-icon = "0.19"
-winit = "0.30"
 
 # Single instance
 single-instance = "0.3"
@@ -39,6 +31,7 @@ notify-rust = "4"
 chrono = "0.4"
 
 # Windows API for auto-start
+[target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 
 [profile.release]

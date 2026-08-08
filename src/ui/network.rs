@@ -11,14 +11,6 @@ pub fn render(
     ui.heading("Network Traffic");
     ui.separator();
 
-    // Time range selector
-    ui.horizontal(|ui| {
-        ui.label("Time Range:");
-        ui.selectable_value(&mut ui.data_mut(|d| d.get_persisted_mut_or("network_time_range".to_string(), 0u8).clone()), 0, "Today");
-        ui.selectable_value(&mut ui.data_mut(|d| d.get_persisted_mut_or("network_time_range".to_string(), 0u8).clone()), 1, "Week");
-        ui.selectable_value(&mut ui.data_mut(|d| d.get_persisted_mut_or("network_time_range".to_string(), 0u8).clone()), 2, "Month");
-    });
-
     ui.add_space(8.0);
 
     // Traffic summary
@@ -103,7 +95,7 @@ pub fn render(
     // History chart placeholder
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Traffic History");
+        ui.heading("Traffic History (7 days)");
         
         let history = db.get_traffic_history(7);
         
@@ -124,7 +116,11 @@ pub fn render(
             ui.horizontal(|ui| {
                 for day in &history {
                     ui.vertical(|ui| {
-                        let bar_height = (day.total_bytes as f32 / max_bytes) * 150.0;
+                        let bar_height = if max_bytes > 0.0 {
+                            (day.total_bytes as f32 / max_bytes) * 150.0
+                        } else {
+                            0.0
+                        };
                         let (response, painter) = ui.allocate_painter(
                             egui::vec2(bar_width, 150.0),
                             egui::Sense::hover()

@@ -102,7 +102,7 @@ pub fn render(
             0.0
         };
         
-        let status_color = if daily_pct >= 0.95 {
+        let _status_color = if daily_pct >= 0.95 {
             egui::Color32::from_rgb(243, 139, 168)
         } else if daily_pct >= 0.8 {
             egui::Color32::from_rgb(249, 226, 175)
@@ -122,7 +122,14 @@ pub fn render(
         
         ui.add_space(4.0);
         
-        progress_bar(ui, daily_pct.min(1.0), status_color);
+        let color = if daily_pct >= 0.95 {
+            egui::Color32::from_rgb(243, 139, 168)
+        } else if daily_pct >= 0.8 {
+            egui::Color32::from_rgb(249, 226, 175)
+        } else {
+            egui::Color32::from_rgb(166, 227, 161)
+        };
+        progress_bar(ui, daily_pct.min(1.0), color);
         
         ui.horizontal(|ui| {
             ui.label(format!("{} / {}", 
@@ -142,8 +149,10 @@ pub fn render(
         ui.set_min_width(ui.available_width());
         ui.label("CPU Cores");
         
-        let cols = (sys_info.cpu_usage.len() as f32).sqrt().ceil() as usize;
-        ui.columns(cols.max(1), |columns| {
+        let num_cores = sys_info.cpu_usage.len();
+        let cols = (num_cores as f32).sqrt().ceil() as usize;
+        let cols = cols.max(1);
+        ui.columns(cols, |columns| {
             for (i, usage) in sys_info.cpu_usage.iter().enumerate() {
                 let col_idx = i % cols;
                 columns[col_idx].horizontal(|ui| {
