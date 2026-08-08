@@ -48,13 +48,13 @@ impl AlertManager {
             return AlertAction::Disconnect;
         }
 
-        if daily_pct >= self.config.critical_threshold && !self.daily_critical_sent {
+        if daily_pct >= 0.95 && !self.daily_critical_sent {
             self.send_notification("Daily traffic at 95%!");
             self.daily_critical_sent = true;
             return AlertAction::CriticalWarning;
         }
 
-        if daily_pct >= self.config.warning_threshold && !self.daily_warning_sent {
+        if daily_pct >= 0.8 && !self.daily_warning_sent {
             self.send_notification("Daily traffic at 80%");
             self.daily_warning_sent = true;
             return AlertAction::Warning;
@@ -66,13 +66,13 @@ impl AlertManager {
             return AlertAction::Disconnect;
         }
 
-        if monthly_pct >= self.config.critical_threshold && !self.monthly_critical_sent {
+        if monthly_pct >= 0.95 && !self.monthly_critical_sent {
             self.send_notification("Monthly traffic at 95%!");
             self.monthly_critical_sent = true;
             return AlertAction::CriticalWarning;
         }
 
-        if monthly_pct >= self.config.warning_threshold && !self.monthly_warning_sent {
+        if monthly_pct >= 0.8 && !self.monthly_warning_sent {
             self.send_notification("Monthly traffic at 80%");
             self.monthly_warning_sent = true;
             return AlertAction::Warning;

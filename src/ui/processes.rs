@@ -32,7 +32,10 @@ pub fn render(
             for (pid, proc_info) in processes.iter().take(50) {
                 body.row(18.0, |mut row| {
                     row.col(|ui| { ui.label(pid.to_string()); });
-                    row.col(|ui| { ui.label(proc_info.name().to_string()); });
+                    row.col(|ui| { 
+                        let name = proc_info.name().to_string_lossy().to_string();
+                        ui.label(name); 
+                    });
                     row.col(|ui| { 
                         let cpu = proc_info.cpu_usage();
                         let color = if cpu >= 50.0 {

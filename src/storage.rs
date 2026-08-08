@@ -63,7 +63,7 @@ impl Database {
             "INSERT INTO traffic (timestamp, interface_name, bytes_sent, bytes_received, total_bytes) 
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
-                record.timestamp,
+                record.timestamp.to_string(),
                 record.interface_name,
                 record.bytes_sent,
                 record.bytes_received,
@@ -78,7 +78,8 @@ impl Database {
              FROM traffic WHERE DATE(timestamp) = ?1"
         ).unwrap();
         
-        let result = stmt.query_row(params![date], |row| {
+        let date_str = date.format("%Y-%m-%d").to_string();
+        let result = stmt.query_row(params![date_str], |row| {
             Ok((
                 row.get::<_, u64>(0)?,
                 row.get::<_, u64>(1)?,
@@ -133,9 +134,10 @@ impl Database {
 
     pub fn cleanup_old_data(&self, retention_days: u32) {
         let cutoff = Utc::now().date_naive() - chrono::Duration::days(retention_days as i64);
+        let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
         self.conn.execute(
             "DELETE FROM traffic WHERE DATE(timestamp) < ?1",
-            params![cutoff],
+            params![cutoff_str],
         ).unwrap();
     }
 }
