@@ -55,36 +55,8 @@ jobs:
         name: ${{ matrix.artifact }}
         path: target/${{ matrix.target }}/release/sysmon*
 
-  build-installer:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: sysmon-windows.exe
-
-    - name: Setup NSIS
-      uses: crazy-max/ghaction-setup-nsis@v4
-
-    - name: Build Installer
-      run: |
-        Copy-Item "sysmon-windows.exe\sysmon.exe" -Destination "installer\"
-        Copy-Item "config.toml" -Destination "installer\"
-        & "C:\Program Files (x86)\NSIS\makensis.exe" "installer\installer.nsi"
-
-    - name: Upload installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: sysmon-installer.exe
-        path: installer\SysMon-Setup.exe
-
   release:
-    needs: [build, build-installer]
+    needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -102,4 +74,3 @@ jobs:
           sysmon-windows.exe/sysmon.exe
           sysmon-linux/sysmon
           sysmon-macos/sysmon
-          sysmon-installer.exe/SysMon-Setup.exe
