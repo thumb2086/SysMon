@@ -1,0 +1,27 @@
+[general]
+app_name = "SysMon"
+start_minimized = false
+start_with_windows = true
+minimize_to_tray = true
+
+[monitoring]
+update_interval_ms = 1000
+record_interval_sec = 60
+data_retention_days = 90
+
+[network]
+daily_limit_gb = 5.0
+monthly_limit_gb = 100.0
+warning_threshold = 0.8
+critical_threshold = 0.95
+
+[alerts]
+enabled = true
+notification_sound = true
+auto_disconnect_on_limit = false
+
+[interface]
+theme = "dark"
+language = "zh-TW"
+show_gpu = true
+default_tab = "dashboard"

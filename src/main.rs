@@ -11,7 +11,7 @@ use single_instance::SingleInstance;
 use std::fs;
 use std::path::PathBuf;
 
-const DEFAULT_CONFIG: &str = include_str!("../config.toml");
+const DEFAULT_CONFIG: &str = include_str!("config_default.toml");
 
 fn main() {
     let instance = SingleInstance::new("SysMon_SingleInstance").unwrap();
