@@ -17,12 +17,11 @@ RequestExecutionLevel admin
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 
-!insertmacro MUI_LANGUAGE "TraditionalChinese"
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Install"
     SetOutPath "$INSTDIR"
-    File "target\release\sysmon.exe"
+    File "installer\build\sysmon.exe"
     
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     WriteRegStr HKCU "Software\SysMon" "InstallDir" "$INSTDIR"
