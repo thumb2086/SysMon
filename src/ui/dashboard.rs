@@ -18,7 +18,6 @@ pub fn render(
     ui.heading("Dashboard");
     ui.separator();
 
-    // Get CPU from background monitor
     let cpu_usage = cpu_monitor.get_usage();
     let avg_cpu = if cpu_usage.is_empty() {
         0.0
@@ -89,6 +88,7 @@ pub fn render(
         }
     }
 
+    // Network Traffic Today
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
         ui.heading("Network Traffic (Today)");
@@ -133,6 +133,72 @@ pub fn render(
                 ui.label(format!("{:.1}%", daily_pct * 100.0));
             });
         });
+    });
+
+    ui.add_space(8.0);
+
+    // Traffic History (7 days)
+    ui.group(|ui| {
+        ui.set_min_width(ui.available_width());
+        ui.heading("Traffic History (7 days)");
+        
+        let history = db.get_traffic_history(7);
+        
+        if history.is_empty() || history.iter().all(|d| d.total_bytes == 0) {
+            ui.label("No traffic data recorded yet");
+        } else {
+            let max_bytes = history.iter()
+                .map(|d| d.total_bytes)
+                .max()
+                .unwrap_or(1) as f32;
+            
+            let available_width = ui.available_width();
+            let bar_width = (available_width / 7.0).min(50.0);
+            
+            ui.vertical(|ui| {
+                for day in &history {
+                    let pct = if max_bytes > 0.0 {
+                        day.total_bytes as f32 / max_bytes
+                    } else {
+                        0.0
+                    };
+                    
+                    let bar_height = pct * 30.0;
+                    let color = if day.total_bytes as f64 > config.daily_limit_bytes() as f64 * 0.8 {
+                        egui::Color32::from_rgb(243, 139, 168)  // Red if near limit
+                    } else {
+                        egui::Color32::from_rgb(137, 180, 250)  // Blue
+                    };
+                    
+                    ui.horizontal(|ui| {
+                        // Date label
+                        ui.label(day.date.format("%m/%d").to_string());
+                        
+                        // Bar
+                        let (response, painter) = ui.allocate_painter(
+                            egui::vec2(100.0, 20.0),
+                            egui::Sense::hover()
+                        );
+                        
+                        let rect = response.rect;
+                        let bg_rect = egui::Rect::from_min_size(
+                            rect.min,
+                            egui::vec2(100.0, 16.0)
+                        );
+                        painter.rect_filled(bg_rect, egui::Rounding::same(4.0), egui::Color32::from_gray(200));
+                        
+                        let bar_rect = egui::Rect::from_min_size(
+                            rect.min,
+                            egui::vec2(100.0 * pct.min(1.0), 16.0)
+                        );
+                        painter.rect_filled(bar_rect, egui::Rounding::same(4.0), color);
+                        
+                        // Amount
+                        ui.label(format!("{}", format_bytes(day.total_bytes)));
+                    });
+                }
+            });
+        }
     });
 
     ui.add_space(8.0);
