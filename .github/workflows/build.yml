@@ -75,16 +75,20 @@ jobs:
         name: sysmon-windows
 
     - name: Install NSIS
-      run: |
-        choco install nsis -y
-        $nsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
-        echo "NSIS_PATH=$nsisPath" >> $env:GITHUB_ENV
+      run: choco install nsis -y
 
     - name: Build Installer
       run: |
-        Get-ChildItem -Recurse
-        Copy-Item "sysmon-windows\sysmon.exe" -Destination "installer\build\"
-        & "${env:NSIS_PATH}" "installer\installer.nsi"
+        $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+        mkdir -Force installer\build
+        $exeFile = Get-ChildItem -Path . -Filter "sysmon.exe" -Recurse | Select-Object -First 1
+        if ($exeFile) {
+          Copy-Item $exeFile.FullName -Destination "installer\build\sysmon.exe"
+          & $nsisPath "installer\installer.nsi"
+        } else {
+          Write-Error "sysmon.exe not found"
+          exit 1
+        }
 
     - name: Upload installer
       uses: actions/upload-artifact@v4
