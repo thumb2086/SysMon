@@ -1,20 +1,21 @@
 use eframe::egui;
 use crate::config::Config;
+use crate::ui::i18n::I18n;
 
 pub fn render(
     ui: &mut egui::Ui,
     config: &mut Config,
+    i18n: &I18n,
 ) {
-    ui.heading("Settings");
+    ui.heading(i18n.t("settings"));
     ui.separator();
 
-    // Network limits
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.label("Traffic Limits");
+        ui.label(i18n.t("traffic_limits"));
         
         ui.horizontal(|ui| {
-            ui.label("Daily limit (GB):");
+            ui.label(format!("{} (GB):", i18n.t("daily_limit")));
             ui.add(egui::DragValue::new(&mut config.network.daily_limit_gb)
                 .speed(0.1)
                 .range(0.1..=1000.0)
@@ -22,7 +23,7 @@ pub fn render(
         });
         
         ui.horizontal(|ui| {
-            ui.label("Monthly limit (GB):");
+            ui.label(format!("{} (GB):", i18n.t("monthly_limit")));
             ui.add(egui::DragValue::new(&mut config.network.monthly_limit_gb)
                 .speed(1.0)
                 .range(1.0..=10000.0)
@@ -30,7 +31,7 @@ pub fn render(
         });
         
         ui.horizontal(|ui| {
-            ui.label("Warning threshold:");
+            ui.label(format!("{}:", i18n.t("alerts")));
             let mut warning_pct = config.network.warning_threshold * 100.0;
             ui.add(egui::DragValue::new(&mut warning_pct)
                 .speed(1.0)
@@ -42,51 +43,54 @@ pub fn render(
 
     ui.add_space(8.0);
 
-    // Alerts
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.label("Alerts");
+        ui.label(i18n.t("alerts"));
         
-        ui.checkbox(&mut config.alerts.enabled, "Enable alerts");
-        ui.checkbox(&mut config.alerts.notification_sound, "Notification sound");
-        ui.checkbox(&mut config.alerts.auto_disconnect_on_limit, "Auto-disconnect on limit");
+        ui.checkbox(&mut config.alerts.enabled, i18n.t("enable_alerts"));
+        ui.checkbox(&mut config.alerts.notification_sound, i18n.t("notification_sound"));
+        ui.checkbox(&mut config.alerts.auto_disconnect_on_limit, i18n.t("auto_disconnect"));
     });
 
     ui.add_space(8.0);
 
-    // General
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.label("General");
+        ui.label(i18n.t("general"));
         
-        ui.checkbox(&mut config.general.start_with_windows, "Start with Windows");
-        ui.checkbox(&mut config.general.minimize_to_tray, "Minimize to tray");
-        ui.checkbox(&mut config.interface.show_gpu, "Show GPU info");
+        ui.checkbox(&mut config.general.start_with_windows, i18n.t("start_with_windows"));
+        ui.checkbox(&mut config.general.minimize_to_tray, i18n.t("minimize_to_tray"));
+        ui.checkbox(&mut config.interface.show_gpu, i18n.t("show_gpu"));
     });
 
     ui.add_space(8.0);
 
-    // Interface
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.label("Interface");
+        ui.label(i18n.t("interface"));
         
         ui.horizontal(|ui| {
-            ui.label("Theme:");
-            ui.selectable_value(&mut config.interface.theme, "dark".to_string(), "Dark");
-            ui.selectable_value(&mut config.interface.theme, "light".to_string(), "Light");
+            ui.label(format!("{}:", i18n.t("theme")));
+            ui.selectable_value(&mut config.interface.theme, "dark".to_string(), i18n.t("dark"));
+            ui.selectable_value(&mut config.interface.theme, "light".to_string(), i18n.t("light"));
+        });
+        
+        ui.horizontal(|ui| {
+            ui.label(format!("{}:", i18n.t("language")));
+            ui.selectable_value(&mut config.interface.language, "zh-TW".to_string(), "中文");
+            ui.selectable_value(&mut config.interface.language, "en".to_string(), "English");
         });
     });
 
     ui.add_space(16.0);
 
     ui.horizontal(|ui| {
-        if ui.button("Save").clicked() {
+        if ui.button(i18n.t("save")).clicked() {
             config.save();
             set_autostart(config.general.start_with_windows);
         }
         
-        if ui.button("Reset to defaults").clicked() {
+        if ui.button(i18n.t("reset")).clicked() {
             *config = Config::default();
             config.save();
         }
@@ -116,5 +120,4 @@ fn set_autostart(enable: bool) {
 
 #[cfg(not(target_os = "windows"))]
 fn set_autostart(_enable: bool) {
-    // Auto-start not implemented for non-Windows platforms
 }

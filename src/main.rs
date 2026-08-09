@@ -5,6 +5,7 @@ mod config;
 mod monitor;
 mod storage;
 mod alerts;
+mod tray;
 mod ui;
 
 use single_instance::SingleInstance;
@@ -20,11 +21,9 @@ fn main() {
         return;
     }
 
-    // Ensure data directory exists
     let data_dir = PathBuf::from("data");
     fs::create_dir_all(&data_dir).ok();
 
-    // Ensure config exists
     let config_path = PathBuf::from("config.toml");
     if !config_path.exists() {
         fs::write(&config_path, DEFAULT_CONFIG).ok();
@@ -37,7 +36,8 @@ fn main() {
             .with_inner_size([500.0, 650.0])
             .with_min_inner_size([400.0, 500.0])
             .with_decorations(true)
-            .with_resizable(true),
+            .with_resizable(true)
+            .with_visible(true),
         ..Default::default()
     };
 

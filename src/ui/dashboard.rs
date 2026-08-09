@@ -3,8 +3,10 @@ use crate::monitor::SystemInfo;
 use crate::monitor::cpu::CpuMonitor;
 use crate::storage::Database;
 use crate::config::Config;
+use crate::ui::i18n::I18n;
 use super::{progress_bar, format_bytes, format_speed};
 use std::sync::Arc;
+use std::collections::VecDeque;
 
 pub fn render(
     ui: &mut egui::Ui,
@@ -12,10 +14,13 @@ pub fn render(
     sys_info: &SystemInfo,
     db: &Database,
     config: &Config,
+    i18n: &I18n,
     network_sent_rate: u64,
     network_recv_rate: u64,
+    download_history: &VecDeque<u64>,
+    upload_history: &VecDeque<u64>,
 ) {
-    ui.heading("Dashboard");
+    ui.heading(i18n.t("dashboard"));
     ui.separator();
 
     let cpu_usage = cpu_monitor.get_usage();
@@ -28,7 +33,7 @@ pub fn render(
     ui.columns(2, |cols| {
         cols[0].group(|ui| {
             ui.set_min_width(ui.available_width());
-            ui.label("CPU");
+            ui.label(i18n.t("cpu"));
             let cpu_color = if avg_cpu >= 80.0 {
                 egui::Color32::from_rgb(243, 139, 168)
             } else if avg_cpu >= 50.0 {
@@ -42,7 +47,7 @@ pub fn render(
 
         cols[1].group(|ui| {
             ui.set_min_width(ui.available_width());
-            ui.label("Memory");
+            ui.label(i18n.t("memory"));
             let mem_pct = if sys_info.memory_total > 0 {
                 sys_info.memory_used as f64 / sys_info.memory_total as f64
             } else {
@@ -69,7 +74,7 @@ pub fn render(
         if let Some(gpu_usage) = sys_info.gpu_usage {
             ui.group(|ui| {
                 ui.set_min_width(ui.available_width());
-                ui.label("GPU");
+                ui.label(i18n.t("gpu"));
                 let gpu_color = if gpu_usage >= 80.0 {
                     egui::Color32::from_rgb(243, 139, 168)
                 } else if gpu_usage >= 50.0 {
@@ -91,7 +96,7 @@ pub fn render(
     // Network Traffic Today
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Network Traffic (Today)");
+        ui.heading(format!("{} ({})", i18n.t("network"), i18n.t("today")));
         
         let today = chrono::Utc::now().date_naive();
         let daily_traffic = db.get_daily_traffic(today);
@@ -104,12 +109,12 @@ pub fn render(
         };
         
         ui.horizontal(|ui| {
-            ui.label("Download:");
+            ui.label(format!("{}:", i18n.t("download")));
             ui.colored_label(egui::Color32::from_rgb(166, 227, 161), format_speed(network_recv_rate));
         });
         
         ui.horizontal(|ui| {
-            ui.label("Upload:");
+            ui.label(format!("{}:", i18n.t("upload")));
             ui.colored_label(egui::Color32::from_rgb(249, 226, 175), format_speed(network_sent_rate));
         });
         
@@ -137,23 +142,93 @@ pub fn render(
 
     ui.add_space(8.0);
 
+    // Real-time network chart
+    ui.group(|ui| {
+        ui.set_min_width(ui.available_width());
+        ui.heading(format!("{} - {}", i18n.t("speed"), i18n.t("network")));
+        
+        let available_width = ui.available_width();
+        let chart_height = 100.0;
+        
+        let (response, painter) = ui.allocate_painter(
+            egui::vec2(available_width, chart_height),
+            egui::Sense::hover()
+        );
+        
+        let rect = response.rect;
+        
+        // Background
+        painter.rect_filled(rect, egui::Rounding::same(4.0), egui::Color32::from_rgb(245, 245, 245));
+        
+        // Grid lines
+        for i in 1..4 {
+            let y = rect.min.y + (rect.height() * i as f32 / 4.0);
+            painter.line_segment(
+                [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
+                egui::Stroke::new(1.0, egui::Color32::from_gray(200)),
+            );
+        }
+        
+        // Find max value for scaling
+        let max_download = download_history.iter().copied().max().unwrap_or(1);
+        let max_upload = upload_history.iter().copied().max().unwrap_or(1);
+        let max_val = max_download.max(max_upload).max(1000) as f32;
+        
+        // Draw download line (green)
+        if download_history.len() > 1 {
+            let points: Vec<egui::Pos2> = download_history.iter().enumerate().map(|(i, &val)| {
+                let x = rect.min.x + (rect.width() * i as f32 / (download_history.len() - 1) as f32);
+                let y = rect.max.y - (rect.height() * val as f32 / max_val);
+                egui::pos2(x, y)
+            }).collect();
+            
+            for window in points.windows(2) {
+                painter.line_segment(
+                    [window[0], window[1]],
+                    egui::Stroke::new(2.0, egui::Color32::from_rgb(166, 227, 161)),
+                );
+            }
+        }
+        
+        // Draw upload line (orange)
+        if upload_history.len() > 1 {
+            let points: Vec<egui::Pos2> = upload_history.iter().enumerate().map(|(i, &val)| {
+                let x = rect.min.x + (rect.width() * i as f32 / (upload_history.len() - 1) as f32);
+                let y = rect.max.y - (rect.height() * val as f32 / max_val);
+                egui::pos2(x, y)
+            }).collect();
+            
+            for window in points.windows(2) {
+                painter.line_segment(
+                    [window[0], window[1]],
+                    egui::Stroke::new(2.0, egui::Color32::from_rgb(249, 226, 175)),
+                );
+            }
+        }
+        
+        // Legend
+        ui.horizontal(|ui| {
+            ui.colored_label(egui::Color32::from_rgb(166, 227, 161), "● Download");
+            ui.colored_label(egui::Color32::from_rgb(249, 226, 175), "● Upload");
+        });
+    });
+
+    ui.add_space(8.0);
+
     // Traffic History (7 days)
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Traffic History (7 days)");
+        ui.heading(format!("{} (7 {})", i18n.t("traffic_history"), i18n.t("total")));
         
         let history = db.get_traffic_history(7);
         
         if history.is_empty() || history.iter().all(|d| d.total_bytes == 0) {
-            ui.label("No traffic data recorded yet");
+            ui.label(i18n.t("no_data"));
         } else {
             let max_bytes = history.iter()
                 .map(|d| d.total_bytes)
                 .max()
                 .unwrap_or(1) as f32;
-            
-            let available_width = ui.available_width();
-            let bar_width = (available_width / 7.0).min(50.0);
             
             ui.vertical(|ui| {
                 for day in &history {
@@ -163,18 +238,15 @@ pub fn render(
                         0.0
                     };
                     
-                    let bar_height = pct * 30.0;
                     let color = if day.total_bytes as f64 > config.daily_limit_bytes() as f64 * 0.8 {
-                        egui::Color32::from_rgb(243, 139, 168)  // Red if near limit
+                        egui::Color32::from_rgb(243, 139, 168)
                     } else {
-                        egui::Color32::from_rgb(137, 180, 250)  // Blue
+                        egui::Color32::from_rgb(137, 180, 250)
                     };
                     
                     ui.horizontal(|ui| {
-                        // Date label
                         ui.label(day.date.format("%m/%d").to_string());
                         
-                        // Bar
                         let (response, painter) = ui.allocate_painter(
                             egui::vec2(100.0, 20.0),
                             egui::Sense::hover()
@@ -193,7 +265,6 @@ pub fn render(
                         );
                         painter.rect_filled(bar_rect, egui::Rounding::same(4.0), color);
                         
-                        // Amount
                         ui.label(format!("{}", format_bytes(day.total_bytes)));
                     });
                 }
@@ -206,7 +277,7 @@ pub fn render(
     // CPU cores
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.label("CPU Cores");
+        ui.label(i18n.t("cpu_cores"));
         
         let num_cores = cpu_usage.len();
         let cols = (num_cores as f32).sqrt().ceil() as usize;

@@ -4,7 +4,11 @@ use crate::monitor::SystemInfo;
 use crate::monitor::cpu::CpuMonitor;
 use crate::storage::Database;
 use crate::alerts::{AlertManager, AlertAction};
+use crate::tray::TrayManager;
+use crate::ui::i18n::I18n;
 use chrono::Datelike;
+use std::sync::Arc;
+use std::collections::VecDeque;
 
 pub struct SysMonApp {
     config: Config,
@@ -12,6 +16,8 @@ pub struct SysMonApp {
     cpu_monitor: Arc<CpuMonitor>,
     db: Database,
     alert_manager: AlertManager,
+    tray: TrayManager,
+    i18n: I18n,
     current_tab: Tab,
     network_sent: u64,
     network_recv: u64,
@@ -19,13 +25,13 @@ pub struct SysMonApp {
     last_network_recv: u64,
     network_sent_rate: u64,
     network_recv_rate: u64,
+    download_history: VecDeque<u64>,
+    upload_history: VecDeque<u64>,
     last_record_time: std::time::Instant,
     last_day: chrono::NaiveDate,
     last_threshold_check: std::time::Instant,
     cached_monthly_traffic: Option<(i32, u32, u64)>,
 }
-
-use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Tab {
@@ -47,7 +53,16 @@ impl SysMonApp {
         let last_network_sent = sys_info.network_sent;
         let last_network_recv = sys_info.network_received;
         
+        let mut download_history = VecDeque::new();
+        let mut upload_history = VecDeque::new();
+        for _ in 0..60 {
+            download_history.push_back(0);
+            upload_history.push_back(0);
+        }
+        
         SysMonApp {
+            tray: TrayManager::new(),
+            i18n: I18n::new(&config.interface.language),
             alert_manager: AlertManager::new(config.alerts.clone()),
             config,
             cpu_monitor: Arc::new(CpuMonitor::new()),
@@ -60,6 +75,8 @@ impl SysMonApp {
             last_network_recv,
             network_sent_rate: 0,
             network_recv_rate: 0,
+            download_history,
+            upload_history,
             last_record_time: std::time::Instant::now(),
             last_day: now.date_naive(),
             last_threshold_check: std::time::Instant::now(),
@@ -82,6 +99,16 @@ impl SysMonApp {
         
         self.network_sent += self.network_sent_rate;
         self.network_recv += self.network_recv_rate;
+        
+        // Update history (keep last 60 entries)
+        self.download_history.push_back(self.network_recv_rate);
+        self.upload_history.push_back(self.network_sent_rate);
+        if self.download_history.len() > 60 {
+            self.download_history.pop_front();
+        }
+        if self.upload_history.len() > 60 {
+            self.upload_history.pop_front();
+        }
     }
 
     fn check_alerts(&mut self) {
@@ -147,7 +174,7 @@ impl SysMonApp {
 
 impl eframe::App for SysMonApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
         
         self.update_network_rates();
         self.check_alerts();
@@ -158,16 +185,16 @@ impl eframe::App for SysMonApp {
                 ui.heading("SysMon");
                 ui.separator();
                 
-                if ui.selectable_label(self.current_tab == Tab::Dashboard, "Dashboard").clicked() {
+                if ui.selectable_label(self.current_tab == Tab::Dashboard, self.i18n.t("dashboard")).clicked() {
                     self.current_tab = Tab::Dashboard;
                 }
-                if ui.selectable_label(self.current_tab == Tab::Network, "Network").clicked() {
+                if ui.selectable_label(self.current_tab == Tab::Network, self.i18n.t("network")).clicked() {
                     self.current_tab = Tab::Network;
                 }
-                if ui.selectable_label(self.current_tab == Tab::Processes, "Processes").clicked() {
+                if ui.selectable_label(self.current_tab == Tab::Processes, self.i18n.t("processes")).clicked() {
                     self.current_tab = Tab::Processes;
                 }
-                if ui.selectable_label(self.current_tab == Tab::Settings, "Settings").clicked() {
+                if ui.selectable_label(self.current_tab == Tab::Settings, self.i18n.t("settings")).clicked() {
                     self.current_tab = Tab::Settings;
                 }
             });
@@ -181,13 +208,17 @@ impl eframe::App for SysMonApp {
                     &self.sys_info,
                     &self.db,
                     &self.config,
+                    &self.i18n,
                     self.network_sent_rate,
                     self.network_recv_rate,
+                    &self.download_history,
+                    &self.upload_history,
                 ),
                 Tab::Network => crate::ui::network::render(
                     ui,
                     &self.db,
                     &self.config,
+                    &self.i18n,
                 ),
                 Tab::Processes => crate::ui::processes::render(
                     ui,
@@ -197,6 +228,7 @@ impl eframe::App for SysMonApp {
                 Tab::Settings => crate::ui::settings::render(
                     ui,
                     &mut self.config,
+                    &self.i18n,
                 ),
             }
         });

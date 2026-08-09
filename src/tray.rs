@@ -1,22 +1,30 @@
-// Tray icon support - simplified version
-// Full tray support requires more complex event loop integration
+use std::sync::{Arc, Mutex};
+
+pub enum UserEvent {
+    Show,
+    Hide,
+    Quit,
+}
 
 pub struct TrayManager {
-    #[allow(dead_code)]
-    tooltip: String,
+    pub show_flag: Arc<Mutex<bool>>,
 }
 
 impl TrayManager {
     pub fn new() -> Self {
         TrayManager {
-            tooltip: "SysMon - System Monitor".to_string(),
+            show_flag: Arc::new(Mutex::new(true)),
         }
     }
 
-    pub fn show_notification(&self, message: &str) {
-        let _ = notify_rust::Notification::new()
-            .summary("SysMon")
-            .body(message)
-            .show();
+    pub fn show_notification(&self, title: &str, message: &str) {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = notify_rust::Notification::new()
+                .summary(title)
+                .body(message)
+                .appname("SysMon")
+                .show();
+        }
     }
 }

@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::storage::Database;
 use crate::config::Config;
+use crate::ui::i18n::I18n;
 use super::{progress_bar, format_bytes};
 use chrono::Datelike;
 
@@ -8,13 +9,13 @@ pub fn render(
     ui: &mut egui::Ui,
     db: &Database,
     config: &Config,
+    i18n: &I18n,
 ) {
-    ui.heading("Network Traffic");
+    ui.heading(i18n.t("network"));
     ui.separator();
 
     ui.add_space(8.0);
 
-    // Traffic summary
     let today = chrono::Utc::now().date_naive();
     let daily_traffic = db.get_daily_traffic(today);
     let daily_limit = config.daily_limit_bytes();
@@ -25,7 +26,7 @@ pub fn render(
 
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Daily Usage");
+        ui.heading(format!("{} ({})", i18n.t("traffic_history"), i18n.t("today")));
         
         let daily_pct = if daily_limit > 0 {
             daily_traffic.total_bytes as f64 / daily_limit as f64
@@ -44,12 +45,13 @@ pub fn render(
         progress_bar(ui, daily_pct.min(1.0), color);
         
         ui.horizontal(|ui| {
-            ui.label(format!("Download: {}", format_bytes(daily_traffic.total_received)));
+            ui.label(format!("{}: {}", i18n.t("download"), format_bytes(daily_traffic.total_received)));
             ui.separator();
-            ui.label(format!("Upload: {}", format_bytes(daily_traffic.total_sent)));
+            ui.label(format!("{}: {}", i18n.t("upload"), format_bytes(daily_traffic.total_sent)));
         });
         
-        ui.label(format!("Total: {} / {} ({:.1}%)", 
+        ui.label(format!("{}: {} / {} ({:.1}%)", 
+            i18n.t("total"),
             format_bytes(daily_traffic.total_bytes),
             format_bytes(daily_limit),
             daily_pct * 100.0
@@ -60,7 +62,7 @@ pub fn render(
 
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Monthly Usage");
+        ui.heading(format!("{} ({})", i18n.t("traffic_history"), i18n.t("total")));
         
         let monthly_pct = if monthly_limit > 0 {
             monthly_traffic.total_bytes as f64 / monthly_limit as f64
@@ -79,12 +81,13 @@ pub fn render(
         progress_bar(ui, monthly_pct.min(1.0), color);
         
         ui.horizontal(|ui| {
-            ui.label(format!("Download: {}", format_bytes(monthly_traffic.total_received)));
+            ui.label(format!("{}: {}", i18n.t("download"), format_bytes(monthly_traffic.total_received)));
             ui.separator();
-            ui.label(format!("Upload: {}", format_bytes(monthly_traffic.total_sent)));
+            ui.label(format!("{}: {}", i18n.t("upload"), format_bytes(monthly_traffic.total_sent)));
         });
         
-        ui.label(format!("Total: {} / {} ({:.1}%)", 
+        ui.label(format!("{}: {} / {} ({:.1}%)", 
+            i18n.t("total"),
             format_bytes(monthly_traffic.total_bytes),
             format_bytes(monthly_limit),
             monthly_pct * 100.0
@@ -93,17 +96,14 @@ pub fn render(
 
     ui.add_space(8.0);
 
-    // History chart
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading("Traffic History (7 days)");
+        ui.heading(format!("{} (7 {})", i18n.t("traffic_history"), i18n.t("total")));
         
         let history = db.get_traffic_history(7);
         
-        if history.is_empty() {
-            ui.centered_and_justified(|ui| {
-                ui.label("No data available yet");
-            });
+        if history.is_empty() || history.iter().all(|d| d.total_bytes == 0) {
+            ui.label(i18n.t("no_data"));
         } else {
             let max_bytes = history.iter()
                 .map(|d| d.total_bytes)
@@ -111,7 +111,7 @@ pub fn render(
                 .unwrap_or(1) as f32;
             
             let available_width = ui.available_width();
-            let bar_width = (available_width / history.len() as f32).min(40.0);
+            let bar_width = (available_width / 7.0).min(40.0);
             
             ui.horizontal(|ui| {
                 for day in &history {

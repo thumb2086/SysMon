@@ -1,6 +1,6 @@
 [package]
 name = "sysmon"
-version = "0.1.1"
+version = "0.4.0"
 edition = "2021"
 authors = ["SysMon"]
 description = "Lightweight system monitor with network traffic tracking"
@@ -30,7 +30,9 @@ notify-rust = "4"
 # Time
 chrono = "0.4"
 
-# Windows API for auto-start
+# Tray icon
+tray-icon = "0.19"
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 

@@ -2,7 +2,7 @@
 setlocal
 
 echo ====================================
-echo SysMon Installer
+echo SysMon Installer v0.4.0
 echo ====================================
 echo.
 
@@ -40,5 +40,13 @@ echo Installation Complete!
 echo ====================================
 echo.
 echo SysMon has been installed to: %INSTALL_DIR%
+echo.
+echo Features:
+echo - CPU/GPU/Memory monitoring
+echo - Network traffic tracking
+echo - Daily/Monthly limits
+echo - Auto-start with Windows
+echo - System tray support
+echo - Chinese/English language
 echo.
 pause
