@@ -74,16 +74,17 @@ jobs:
       with:
         name: sysmon-windows
 
-    - name: Setup NSIS
-      uses: crazy-max/ghaction-setup-nsis@v4
-      with:
-        version: '3'
+    - name: Install NSIS
+      run: |
+        choco install nsis -y
+        $nsisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+        echo "NSIS_PATH=$nsisPath" >> $env:GITHUB_ENV
 
     - name: Build Installer
       run: |
         mkdir installer\build
         Copy-Item "sysmon-windows\sysmon.exe" -Destination "installer\build\"
-        & "C:\Program Files (x86)\NSIS\makensis.exe" "installer\installer.nsi"
+        & "${env:NSIS_PATH}" "installer\installer.nsi"
 
     - name: Upload installer
       uses: actions/upload-artifact@v4
