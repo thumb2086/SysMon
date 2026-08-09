@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 pub fn render(
     ui: &mut egui::Ui,
-    cpu_monitor: &Arc<CpuMonitor>,
+    _cpu_monitor: &Arc<CpuMonitor>,
     sys_info: &SystemInfo,
 ) {
     ui.heading("Processes");
