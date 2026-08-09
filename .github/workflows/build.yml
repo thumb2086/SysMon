@@ -82,7 +82,8 @@ jobs:
 
     - name: Build Installer
       run: |
-        mkdir installer\build
+        ls -la
+        ls -la sysmon-windows
         Copy-Item "sysmon-windows\sysmon.exe" -Destination "installer\build\"
         & "${env:NSIS_PATH}" "installer\installer.nsi"
 
