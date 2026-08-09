@@ -17,12 +17,12 @@ impl TrayManager {
         }
     }
 
-    pub fn show_notification(&self, title: &str, message: &str) {
+    pub fn show_notification(&self, title: &str, _message: &str) {
         #[cfg(target_os = "windows")]
         {
             let _ = notify_rust::Notification::new()
                 .summary(title)
-                .body(message)
+                .body(_message)
                 .appname("SysMon")
                 .show();
         }

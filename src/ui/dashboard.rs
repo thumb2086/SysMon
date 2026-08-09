@@ -93,7 +93,6 @@ pub fn render(
         }
     }
 
-    // Network Traffic Today
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
         ui.heading(format!("{} ({})", i18n.t("network"), i18n.t("today")));
@@ -157,10 +156,8 @@ pub fn render(
         
         let rect = response.rect;
         
-        // Background
         painter.rect_filled(rect, egui::Rounding::same(4.0), egui::Color32::from_rgb(245, 245, 245));
         
-        // Grid lines
         for i in 1..4 {
             let y = rect.min.y + (rect.height() * i as f32 / 4.0);
             painter.line_segment(
@@ -169,12 +166,10 @@ pub fn render(
             );
         }
         
-        // Find max value for scaling
         let max_download = download_history.iter().copied().max().unwrap_or(1);
         let max_upload = upload_history.iter().copied().max().unwrap_or(1);
         let max_val = max_download.max(max_upload).max(1000) as f32;
         
-        // Draw download line (green)
         if download_history.len() > 1 {
             let points: Vec<egui::Pos2> = download_history.iter().enumerate().map(|(i, &val)| {
                 let x = rect.min.x + (rect.width() * i as f32 / (download_history.len() - 1) as f32);
@@ -190,7 +185,6 @@ pub fn render(
             }
         }
         
-        // Draw upload line (orange)
         if upload_history.len() > 1 {
             let points: Vec<egui::Pos2> = upload_history.iter().enumerate().map(|(i, &val)| {
                 let x = rect.min.x + (rect.width() * i as f32 / (upload_history.len() - 1) as f32);
@@ -206,7 +200,6 @@ pub fn render(
             }
         }
         
-        // Legend
         ui.horizontal(|ui| {
             ui.colored_label(egui::Color32::from_rgb(166, 227, 161), "● Download");
             ui.colored_label(egui::Color32::from_rgb(249, 226, 175), "● Upload");
@@ -218,7 +211,7 @@ pub fn render(
     // Traffic History (7 days)
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading(format!("{} (7 {})", i18n.t("traffic_history"), i18n.t("total")));
+        ui.heading(format!("{} (7 days)", i18n.t("traffic_history")));
         
         let history = db.get_traffic_history(7);
         

@@ -98,7 +98,7 @@ pub fn render(
 
     ui.group(|ui| {
         ui.set_min_width(ui.available_width());
-        ui.heading(format!("{} (7 {})", i18n.t("traffic_history"), i18n.t("total")));
+        ui.heading(format!("{} (7 days)", i18n.t("traffic_history")));
         
         let history = db.get_traffic_history(7);
         

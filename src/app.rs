@@ -100,7 +100,6 @@ impl SysMonApp {
         self.network_sent += self.network_sent_rate;
         self.network_recv += self.network_recv_rate;
         
-        // Update history (keep last 60 entries)
         self.download_history.push_back(self.network_recv_rate);
         self.upload_history.push_back(self.network_sent_rate);
         if self.download_history.len() > 60 {
